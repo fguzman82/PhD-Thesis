@@ -57,7 +57,7 @@ if __name__ == '__main__':
     # img_path = 'example_2.JPEG'
     save_path = './output/'
 
-    # gt_category = 207  # Golden retriever
+    ## gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
