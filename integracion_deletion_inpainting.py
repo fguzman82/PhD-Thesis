@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 from torchvision import models
 
-#sys.path.insert(0, './generativeimptorch')
+sys.path.insert(0, './generativeimptorch')
 
 use_cuda = torch.cuda.is_available()
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     # img_path = 'example_2.JPEG'
     save_path = './output/'
 
-    ## gt_category = 207  # Golden retriever
+    gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
