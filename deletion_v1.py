@@ -1,6 +1,4 @@
-# algoritmo de generacion limitado a la probabilidad máx de la clase real, funciona mejor con -log() en la función
-# objetivo
-
+#version 1: DELETION WITHOUT REGU
 import os
 import cv2
 import sys
@@ -18,7 +16,8 @@ from PIL import ImageFilter, Image
 import matplotlib.pyplot as plt
 from skimage.transform import resize
 from torchvision import models
-from skimage.util import random_noise
+
+#sys.path.insert(0, './generativeimptorch')
 
 use_cuda = torch.cuda.is_available()
 
@@ -55,17 +54,17 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    # img_path = 'perro_gato.jpg'
+    img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    img_path = 'example_2.JPEG'
+    #img_path = 'example_2.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
-    # gt_category = 281  # tabby cat
+    gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    # gt_category = 565  # freight car
 
     try:
         shutil.rmtree(save_path)
@@ -76,13 +75,13 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
-    max_iterations = 501
-    l1_coeff = 1e-4
+    max_iterations = 301
+    l1_coeff = 1e-4#5*1e-6  # 1e-4 (preservation)
     size = 224
 
     tv_beta = 3
     tv_coeff = 1e-2
-    factorTV = 0  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+    factorTV = 0*0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -112,25 +111,13 @@ if __name__ == '__main__':
     # model = torch.nn.DataParallel(model).to('cuda')
     # model = model.to('cuda')
 
-    activation_orig = {}
-    gradients_orig = {}
-
     init_time = time.time()
 
     # Leer la imágen del archivo
     # original_img = cv2.imread(img_path, 1)
     # img = np.float32(original_img) / 255
     original_img_pil = Image.open(img_path).convert('RGB')
-
-    # voy a agregar un poco de ruido a la imagen
-    width, height = original_img_pil.size
-    noise_img = Image.effect_noise((width, height), 25)
-    noise_img_3 = Image.merge('RGB', (noise_img, noise_img, noise_img))
-    img_sum = Image.blend(original_img_pil, noise_img_3, 0.5)
-
-    #original_np = np.array(img_sum)
-    #plt.imshow(original_np)
-    #plt.show()
+    # original_np = np.array(original_img_pil)
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
@@ -142,10 +129,9 @@ if __name__ == '__main__':
     ])
 
     # se normaliza la imágen y se agrega una dimensión [1,3,244,244]
-    img_normal = transform(img_sum).unsqueeze(0)  # Tensor (1, 3, 224, 224)
+    img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
     img_normal.requires_grad = False
     img_normal = img_normal.to(device)
-
 
     cat_orig = label_map[gt_category]
     print('explicacion para: ', cat_orig)
@@ -168,6 +154,7 @@ if __name__ == '__main__':
     Image.fromarray(img_unormalize).save(o_img_path, 'JPEG')
 
     print('probabilidad original para ', cat_orig, '=', prob_orig)
+
 
     for param in model.parameters():
         param.requires_grad = False
@@ -205,22 +192,10 @@ if __name__ == '__main__':
 
         similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
 
-        # + tv_coeff * tv_norm(mask, tv_beta)
-        # loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity + factorTV * tv_coeff * tv_norm(mask,
-        #                                                                                          tv_beta)  # tensor
-
+        loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + similarity
         #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category]
-
-        #mejor para defensa, solo depende de la predicción de la categoria a defender
-        #más un poco de regularización de variación total (TV)
-        loss = l1_coeff * torch.sum(torch.abs(mask)) - outputs[0, gt_category] + factorTV * tv_coeff * tv_norm(mask,
-                                                                                                  tv_beta)
-
-        #depende de la calidad de la imagen de entrada porque depende del puntaje original
-        #loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity
-
-        #fuerte en pixeles:
-        #loss = l1_coeff * torch.sum(torch.abs(mask)) - torch.log(outputs[0, gt_category])
+        #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category] + factorTV * tv_coeff * tv_norm(mask,
+        #                                                                                                       tv_beta)
 
         loss.backward()
 
@@ -229,7 +204,7 @@ if __name__ == '__main__':
         # print('min mask(grad)=', mask_grads.min())
         # torch.nn.utils.clip_grad_norm_(mask, 1, norm_type=float('inf'))
 
-        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=2, dim=(2, 3))
+        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         # torch.nn.utils.clip_grad_norm_(mask, 1)
 
         # mask_grads = np.squeeze(mask.grad.data.cpu().numpy())
@@ -310,7 +285,7 @@ if __name__ == '__main__':
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
-    plt.imshow(mask_np)  # 1-mask para deletion
+    plt.imshow(1 - mask_np)  # 1-mask para deletion
     plt.show()
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
@@ -318,7 +293,7 @@ if __name__ == '__main__':
     original_img_pil = Image.open(img_path).convert('RGB')
     img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
 
-    mask_tensor = numpy_to_torch2(1-mask_np)  # tensor (1, 1, 224, 224)
+    mask_tensor = numpy_to_torch2(1 - mask_np)  # tensor (1, 1, 224, 224)
     mask_expanded = mask_tensor.expand(1, 3, mask.size(2), mask.size(3))  # tensor (1, 3, 224, 224)
     null_img = torch.zeros(1, 3, size, size)
     img_masked = img_normal.mul(mask_expanded)
