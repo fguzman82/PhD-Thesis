@@ -1,3 +1,5 @@
+# Generation V1: Sin regularización... alucina
+
 import os
 import cv2
 import sys
@@ -53,16 +55,16 @@ def numpy_to_torch2(img):
 if __name__ == '__main__':
 
     # img_path = 'perro_gato.jpg'
-    # img_path = 'dog.jpg'
+    img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    img_path = 'example_2.JPEG'
+    # img_path = 'example_2.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
-    # gt_category = 258  # "Samoyed, Samoyede"
+    gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    # gt_category = 565  # freight car
 
     try:
         shutil.rmtree(save_path)
@@ -74,7 +76,7 @@ if __name__ == '__main__':
 
     learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
     max_iterations = 501
-    l1_coeff = 1e-6 #2*0.5*1e-7    # 1e-4 (preservation)
+    l1_coeff = 1e-4
     size = 224
 
     tv_beta = 3
@@ -112,30 +114,6 @@ if __name__ == '__main__':
     activation_orig = {}
     gradients_orig = {}
 
-
-    # no se necesitan gradientes para los parametros
-    # for param in model.parameters():
-    #    param.requires_grad = False
-
-    def get_activation_orig(name):
-        def hook(model, input, output):
-            activation_orig[name] = output.clone()
-
-        return hook
-
-
-    def get_gradients_orig(name):
-        def hook(model, grad_input, grad_output):
-            gradients_orig[name] = grad_output[0].cpu().detach().numpy()
-
-        return hook
-
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            F_hook = layer.register_forward_hook(get_activation_orig(name))
-            B_hook = layer.register_backward_hook(get_gradients_orig(name))
-
     init_time = time.time()
 
     # Leer la imágen del archivo
@@ -144,16 +122,14 @@ if __name__ == '__main__':
     original_img_pil = Image.open(img_path).convert('RGB')
 
     # voy a agregar un poco de ruido a la imagen
-    #noise_img = Image.effect_noise((500, 375), 25)
-    #noise_img_3 = Image.merge('RGB', (noise_img, noise_img, noise_img))
-    #img_sum = Image.blend(original_img_pil, noise_img_3, 0.5)
+    width, height = original_img_pil.size
+    noise_img = Image.effect_noise((width, height), 25)
+    noise_img_3 = Image.merge('RGB', (noise_img, noise_img, noise_img))
+    img_sum = Image.blend(original_img_pil, noise_img_3, 0.5)
 
     #original_np = np.array(img_sum)
     #plt.imshow(original_np)
     #plt.show()
-
-
-
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
@@ -165,7 +141,7 @@ if __name__ == '__main__':
     ])
 
     # se normaliza la imágen y se agrega una dimensión [1,3,244,244]
-    img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
+    img_normal = transform(img_sum).unsqueeze(0)  # Tensor (1, 3, 224, 224)
     img_normal.requires_grad = False
     img_normal = img_normal.to(device)
 
@@ -192,59 +168,14 @@ if __name__ == '__main__':
 
     print('probabilidad original para ', cat_orig, '=', prob_orig)
 
-    F_hook.remove()
-    B_hook.remove()
-    del model
-
-    # CALCULO ITERATIVO DE LA MASCARA
-    model = models.googlenet(pretrained=True)
-    model.to(device)
-    model.eval()
-
-    gradients = {}
-
-
-    def get_activation_mask(name):
-        def hook(model, input, output):
-            act_mask = output
-            # print(act_mask.shape). #debug
-            # print(activation_orig[name].shape) #debug
-            limite_sup = (act_mask <= torch.fmax(torch.tensor(0), activation_orig[name]))
-            limite_inf = (act_mask >= torch.fmin(torch.tensor(0), activation_orig[name]))
-            oper = limite_sup * limite_inf
-            # print('oper shape=',oper.shape). #debug
-            act_mask.requires_grad_(True)
-            act_mask.retain_grad()
-            h = act_mask.register_hook(lambda grad: grad * oper)
-            # x.register_hook(update_gradients(2))
-            # activation[name]=act_mask
-            # h.remove()
-
-        return hook
-
-
-    def get_act_mask_gradients(name):
-        def hook(model, grad_input, grad_output):
-            gradients[name] = grad_output[0]
-            # print('backward')
-            # return (new_grad,)
-
-        return hook
-
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            layer.register_forward_hook(get_activation_mask(name))
-            layer.register_backward_hook(get_act_mask_gradients(name))
-
     for param in model.parameters():
-        param.requires_grad = True
+        param.requires_grad = False
 
     img = img_normal  # tensor (1, 3, 224, 224)
     np.random.seed(seed=0)
-    # mask = np.random.uniform(0, 0.01, size=(224, 224))  # array (224, 224)  generation
+    mask = np.random.uniform(0, 0.01, size=(224, 224))  # array (224, 224)  generation
     # mask = np.random.rand(224, 224)
-    mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
+    # mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
     mask = numpy_to_torch(mask)  # tensor (1, 1, 224, 224)
 
     null_img = torch.zeros(1, 3, size, size).to(device)  # tensor (1, 3, 224, 224)
@@ -278,8 +209,17 @@ if __name__ == '__main__':
         #                                                                                          tv_beta)  # tensor
 
         #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category]
-        # loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity
-        loss = l1_coeff * torch.sum(torch.abs(mask)) - torch.log(outputs[0, gt_category])
+
+        #mejor para defensa, solo depende de la predicción de la categoria a defender
+        #más un poco de regularización de variación total (TV)
+        loss = l1_coeff * torch.sum(torch.abs(mask)) - outputs[0, gt_category] + factorTV * tv_coeff * tv_norm(mask,
+                                                                                                  tv_beta)
+
+        #depende de la calidad de la imagen de entrada porque depende del puntaje original
+        #loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity
+
+        #fuerte en pixeles:
+        #loss = l1_coeff * torch.sum(torch.abs(mask)) - torch.log(outputs[0, gt_category])
 
         loss.backward()
 
