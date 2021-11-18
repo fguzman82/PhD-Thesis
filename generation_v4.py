@@ -102,16 +102,16 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    # img_path = 'perro_gato.jpg'
-    img_path = 'dog.jpg'
+    img_path = 'perro_gato.jpg'
+    # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
-    # gt_category = 281  # tabby cat
-    gt_category = 258  # "Samoyed, Samoyede"
+    gt_category = 281  # tabby cat
+    # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
     # gt_category = 1 # goldfish, Carassius auratus
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
-    max_iterations = 101
+    max_iterations = 501
     l1_coeff = 1e-6  # 1e-4 (preservation)
     size = 224
 
@@ -307,6 +307,8 @@ if __name__ == '__main__':
     #                       lr=learning_rate,
     #                       momentum=momentum,
     #                       dampening=momentum)
+    loss_np = np.empty((max_iterations, 1))
+    pred_mask_np = np.empty((max_iterations, 1))
 
     for i in range(max_iterations):
         upsampled_mask = upsample(mask)
@@ -339,7 +341,7 @@ if __name__ == '__main__':
 
         #similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
 
-        loss = l1_coeff * torch.sum(torch.abs(mask)) - torch.log(outputs[0, gt_category])
+        loss = l1_coeff * torch.sum(torch.abs(mask)) - (outputs[0, gt_category])
 
         loss.backward()
 
@@ -394,6 +396,16 @@ if __name__ == '__main__':
         # plt.imshow(mask_np)
         # plt.show()
         # DEBUG
+        pred_mask = outputs[0, gt_category].cpu().detach().numpy()
+        loss_np[i] = loss.cpu().detach().numpy()
+        pred_mask_np[i] = pred_mask
+
+        # if (i % 10) == 0:
+        #    mask_T = np.moveaxis(mask.cpu().detach().numpy()[0, :].transpose(), 0, 1)
+        #    plt.title('iter: {}, P={:.4f}'.format(i, pred_mask))
+        #    plt.imshow(1-mask_T)
+        #    plt.show()
+
 
         if (i % 20) == 0:
             # Save intermediate steps
@@ -423,6 +435,18 @@ if __name__ == '__main__':
     # plt.imshow(up_mask_np[0, 0, :])
     # plt.show()
     print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
+
+    plt.plot(loss_np)
+    #plt.title('loss')
+    plt.ylabel('loss')
+    plt.xlabel('# iter')
+    plt.show()
+
+    plt.plot(pred_mask_np)
+    # plt.title('loss')
+    plt.ylabel('prob')
+    plt.xlabel('# iter')
+    plt.show()
 
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)

@@ -125,7 +125,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     learning_rate = 0.3  # 0.1 (preservation sparser) 0.3 (preservation dense)
-    max_iterations = 101
+    max_iterations = 130
     l1_coeff = 0.01e-5  # 1e-4 (preservation)
     size = 224
 
@@ -294,7 +294,7 @@ if __name__ == '__main__':
     # null_img = torch.zeros(1, 3, size, size).to(device)  # tensor (1, 3, 224, 224)
 
     # imagen nulla difuminada
-    orig_img_blur = original_img_pil.filter(ImageFilter.GaussianBlur(10))
+    orig_img_blur = original_img_pil.filter(ImageFilter.GaussianBlur(5))
     null_img_blur = transform(orig_img_blur).unsqueeze(0)
     null_img_blur.requires_grad = False
     null_img = null_img_blur.to(device)
@@ -307,6 +307,8 @@ if __name__ == '__main__':
     #                       lr=learning_rate,
     #                       momentum=momentum,
     #                       dampening=momentum)
+    loss_np = np.empty((max_iterations, 1))
+    pred_mask_np = np.empty((max_iterations, 1))
 
     for i in range(max_iterations):
         upsampled_mask = upsample(mask)
@@ -400,6 +402,15 @@ if __name__ == '__main__':
         # plt.show()
         # DEBUG
 
+        pred_mask = outputs[0, gt_category].cpu().detach().numpy()
+        loss_np[i] = loss.cpu().detach().numpy()
+        pred_mask_np[i] = pred_mask
+        #if (i % 5) == 0:
+        #    mask_T = np.moveaxis(mask.cpu().detach().numpy()[0, :].transpose(), 0, 1)
+        #    plt.title('iter: {}, P={:.4f}'.format(i, pred_mask))
+        #    plt.imshow(1-mask_T)
+        #    plt.show()
+
         if (i % 20) == 0:
             # Save intermediate steps
             amax, aind = outputs.max(dim=1)
@@ -429,6 +440,20 @@ if __name__ == '__main__':
     # plt.show()
     print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
 
+    plt.plot(loss_np)
+    #plt.title('loss')
+    plt.ylabel('loss')
+    plt.xlabel('# iter')
+    plt.show()
+
+    plt.plot(pred_mask_np)
+    # plt.title('loss')
+    plt.ylabel('prob')
+    plt.xlabel('# iter')
+    plt.show()
+
+
+
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)
     print('max mask=', mask_np.max())
@@ -444,7 +469,7 @@ if __name__ == '__main__':
     mask_tensor = numpy_to_torch2(1 - mask_np)  # tensor (1, 1, 224, 224)
     mask_expanded = mask_tensor.expand(1, 3, mask.size(2), mask.size(3))  # tensor (1, 3, 224, 224)
     null_img = torch.zeros(1, 3, size, size)
-    img_masked = img_normal.mul(upsample(mask_expanded))#+null_img_blur.mul(1 - mask_expanded)
+    img_masked = img_normal.mul(upsample(mask_expanded))+null_img_blur.mul(1 - mask_expanded)
 
     # transforma de (PIL o tensor) de (1,3,224,224) a np; desnormaliza y grafica
     img_normal_np = img_masked.numpy()

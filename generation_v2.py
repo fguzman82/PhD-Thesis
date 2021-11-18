@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
     max_iterations = 501
-    l1_coeff = 1e-6 #2*0.5*1e-7    # 1e-4 (preservation)
+    l1_coeff = 1e-8#1e-6 #2*0.5*1e-7    # 1e-4 (preservation)
     size = 224
 
     tv_beta = 3
@@ -152,9 +152,6 @@ if __name__ == '__main__':
     #original_np = np.array(img_sum)
     #plt.imshow(original_np)
     #plt.show()
-
-
-
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
@@ -258,6 +255,8 @@ if __name__ == '__main__':
     #                       lr=learning_rate,
     #                       momentum=momentum,
     #                       dampening=momentum)
+    loss_np = np.empty((max_iterations, 1))
+    pred_mask_np = np.empty((max_iterations, 1))
 
     for i in range(max_iterations):
         # upsampled_mask = upsample(mask)
@@ -280,7 +279,7 @@ if __name__ == '__main__':
 
         #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category]
         # loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity
-        loss = l1_coeff * torch.sum(torch.abs(mask)) - torch.log(outputs[0, gt_category])
+        loss = l1_coeff * torch.sum(torch.abs(mask)) - (outputs[0, gt_category])
 
         loss.backward()
 
@@ -336,6 +335,15 @@ if __name__ == '__main__':
         # plt.imshow(mask_np)
         # plt.show()
         # DEBUG
+        pred_mask = outputs[0, gt_category].cpu().detach().numpy()
+        loss_np[i] = loss.cpu().detach().numpy()
+        pred_mask_np[i] = pred_mask
+
+        # if (i % 10) == 0:
+        #    mask_T = np.moveaxis(mask.cpu().detach().numpy()[0, :].transpose(), 0, 1)
+        #    plt.title('iter: {}, P={:.4f}'.format(i, pred_mask))
+        #    plt.imshow(1-mask_T)
+        #    plt.show()
 
         if (i % 20) == 0:
             # Save intermediate steps
@@ -365,6 +373,18 @@ if __name__ == '__main__':
     # plt.imshow(up_mask_np[0, 0, :])
     # plt.show()
     print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
+
+    plt.plot(loss_np)
+    #plt.title('loss')
+    plt.ylabel('loss')
+    plt.xlabel('# iter')
+    plt.show()
+
+    plt.plot(pred_mask_np)
+    # plt.title('loss')
+    plt.ylabel('prob')
+    plt.xlabel('# iter')
+    plt.show()
 
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)
