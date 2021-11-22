@@ -125,7 +125,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
-    max_iterations = 501
+    max_iterations = 301
     l1_coeff = 1e-6  # 1e-4 (preservation)
     size = 224
 
@@ -333,15 +333,15 @@ if __name__ == '__main__':
 
 
 
-        perturbated_input = img.mul(upsampled_mask) + null_img.mul(1 - upsampled_mask)
-        # perturbated_input = img.mul(upsampled_mask) + img_inpainted.mul(1 - upsampled_mask)
+        #perturbated_input = img.mul(upsampled_mask) + null_img.mul(1 - upsampled_mask)
+        perturbated_input = img.mul(upsampled_mask) + img_inpainted.mul(1 - upsampled_mask)
 
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # tensor (1, 1000)
 
         #similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
 
-        loss = l1_coeff * torch.sum(torch.abs(mask)) - (outputs[0, gt_category])
+        loss = l1_coeff * torch.sum(torch.abs(mask)) - torch.log(outputs[0, gt_category])
 
         loss.backward()
 

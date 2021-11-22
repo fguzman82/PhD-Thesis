@@ -106,16 +106,16 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    img_path = 'perro_gato.jpg'
-    # img_path = 'dog.jpg'
+    #img_path = 'perro_gato.jpg'
+    img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
     save_path = './output/'
 
-    gt_category = 207  # Golden retriever
+    # gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
-    # gt_category = 258  # "Samoyed, Samoyede"
+    gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
     # gt_category = 1 # goldfish, Carassius auratus
@@ -205,7 +205,7 @@ if __name__ == '__main__':
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -359,7 +359,7 @@ if __name__ == '__main__':
         # print('min mask(grad)=', mask_grads.min())
         # torch.nn.utils.clip_grad_norm_(mask, 1, norm_type=float('inf'))
 
-        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
+        #mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         # torch.nn.utils.clip_grad_norm_(mask, 1)
 
         # mask_grads = np.squeeze(mask.grad.data.cpu().numpy())

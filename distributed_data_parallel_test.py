@@ -13,6 +13,8 @@ os.environ['MASTER_PORT'] = '5678'
 def example(rank, world_size):
     # create default process group
     dist.init_process_group("gloo", rank=rank, world_size=world_size)
+    print('rank=', rank)
+    print('world_size=', world_size)
     # create local model
     model = nn.Linear(10, 10).to(rank)
 
@@ -34,7 +36,7 @@ def example(rank, world_size):
 def main():
     world_size = 2
     mp.spawn(example,
-        args=(world_size,),
+        args=(world_size, ),
         nprocs=world_size,
         join=True)
 

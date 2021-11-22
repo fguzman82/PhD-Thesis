@@ -1,4 +1,4 @@
-#version 2: DELETION WITH REGU AND NULL BG
+# version 2: DELETION WITH REGU AND NULL BG
 import os
 import cv2
 import sys
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 from torchvision import models
 
-#sys.path.insert(0, './generativeimptorch')
+# sys.path.insert(0, './generativeimptorch')
 
 use_cuda = torch.cuda.is_available()
 
@@ -79,10 +79,6 @@ if __name__ == '__main__':
     l1_coeff = 0.01e-5  # 1e-4 (preservation)
     size = 224
 
-    tv_beta = 3
-    tv_coeff = 1e-2
-    factorTV = 0*0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # model = models.vgg16(pretrained=True)
@@ -133,10 +129,13 @@ if __name__ == '__main__':
         return hook
 
 
+    F_hook = []
+    B_hook = []
+
     for name, layer in model.named_children():
         if name in list_of_layers:
-            F_hook = layer.register_forward_hook(get_activation_orig(name))
-            B_hook = layer.register_backward_hook(get_gradients_orig(name))
+            F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
+            B_hook.append(layer.register_backward_hook(get_gradients_orig(name)))
 
     init_time = time.time()
 
@@ -182,14 +181,17 @@ if __name__ == '__main__':
 
     print('probabilidad original para ', cat_orig, '=', prob_orig)
 
-    F_hook.remove()
-    B_hook.remove()
-    del model
 
     # CALCULO ITERATIVO DE LA MASCARA
-    model = models.googlenet(pretrained=True)
-    model.to(device)
-    model.eval()
+    #model = models.googlenet(pretrained=True)
+    #model.to(device)
+    #model.eval()
+
+    for fh in F_hook:
+        fh.remove()
+
+    for bh in B_hook:
+        bh.remove()
 
     gradients = {}
 
@@ -237,6 +239,10 @@ if __name__ == '__main__':
     # mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
     mask = numpy_to_torch(mask)  # tensor (1, 1, 224, 224)
 
+    #mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 224, 224)))
+    #mask = mask.to(device)
+    #mask.requires_grad = True
+
     null_img = torch.zeros(1, 3, size, size).to(device)  # tensor (1, 3, 224, 224)
 
     # Definición del tipo de optimizador
@@ -257,6 +263,7 @@ if __name__ == '__main__':
         # upsampled_mask = mask
 
         perturbated_input = img.mul(upsampled_mask) + null_img.mul(1 - upsampled_mask)
+        perturbated_input = perturbated_input.to(torch.float32)
 
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # tensor (1, 1000)
@@ -267,8 +274,7 @@ if __name__ == '__main__':
         # loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity + factorTV * tv_coeff * tv_norm(mask,
         #                                                                                          tv_beta)  # tensor
 
-        loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category] + factorTV * tv_coeff * tv_norm(mask,
-                                                                                                                   tv_beta)
+        loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category]
 
         loss.backward()
 
@@ -277,7 +283,7 @@ if __name__ == '__main__':
         # print('min mask(grad)=', mask_grads.min())
         # torch.nn.utils.clip_grad_norm_(mask, 1, norm_type=float('inf'))
 
-        mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
+        #mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         # torch.nn.utils.clip_grad_norm_(mask, 1)
 
         # mask_grads = np.squeeze(mask.grad.data.cpu().numpy())
@@ -298,7 +304,6 @@ if __name__ == '__main__':
         # plt.imshow(maskgrads_np)
         # plt.title("mask grad")
         # plt.show()
-
 
         # control
         # upsampled_mask_control = mask.expand(1, 3, mask.size(2), mask.size(3))  # tensor (1, 3, 224, 224)

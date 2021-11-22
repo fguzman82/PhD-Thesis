@@ -186,10 +186,13 @@ if __name__ == '__main__':
         return hook
 
 
+    F_hook = []
+    B_hook = []
+
     for name, layer in model.named_children():
         if name in list_of_layers:
-            F_hook = layer.register_forward_hook(get_activation_orig(name))
-            B_hook = layer.register_backward_hook(get_gradients_orig(name))
+            F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
+            B_hook.append(layer.register_backward_hook(get_gradients_orig(name)))
 
     init_time = time.time()
 
@@ -235,14 +238,20 @@ if __name__ == '__main__':
 
     print('probabilidad original para ', cat_orig, '=', prob_orig)
 
-    F_hook.remove()
-    B_hook.remove()
-    del model
+    #F_hook.remove()
+    #B_hook.remove()
+    #del model
 
     # CALCULO ITERATIVO DE LA MASCARA
-    model = models.googlenet(pretrained=True)
-    model.to(device)
-    model.eval()
+    #model = models.googlenet(pretrained=True)
+    #model.to(device)
+    #model.eval()
+
+    for fh in F_hook:
+        fh.remove()
+
+    for bh in B_hook:
+        bh.remove()
 
     gradients = {}
 
@@ -311,7 +320,8 @@ if __name__ == '__main__':
     pred_mask_np = np.empty((max_iterations, 1))
 
     for i in range(max_iterations):
-        upsampled_mask = upsample(mask)
+        #upsampled_mask = upsample(mask)
+        upsampled_mask = mask
 
         # The single channel mask is used with an RGB image,
         # so the mask is duplicated to have 3 channel,

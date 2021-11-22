@@ -132,8 +132,8 @@ class CausalMetric():
         predictions = torch.FloatTensor(n_samples, n_classes)
         assert n_samples % batch_size == 0
         for i in tqdm(range(n_samples // batch_size), desc='Predicting labels'):
-            preds = self.model(img_batch[i*batch_size:(i+1)*batch_size].cuda()).cpu()
-            predictions[i*batch_size:(i+1)*batch_size] = preds
+            preds = torch.nn.Softmax(dim=1)(self.model(img_batch[i*batch_size:(i+1)*batch_size].cuda()))
+            predictions[i*batch_size:(i+1)*batch_size] = preds.cpu()
         top = np.argmax(predictions, -1)
         n_steps = (HW + self.step - 1) // self.step
         scores = np.empty((n_steps + 1, n_samples))
@@ -158,7 +158,7 @@ class CausalMetric():
             # Iterate over batches
             for j in range(n_samples // batch_size):
                 # Compute new scores
-                preds = self.model(start[j*batch_size:(j+1)*batch_size].cuda())
+                preds = torch.nn.Softmax(dim=1)(self.model(start[j*batch_size:(j+1)*batch_size].cuda()))
                 preds = preds.cpu().numpy()[range(batch_size), top[j*batch_size:(j+1)*batch_size]]
                 scores[i, j*batch_size:(j+1)*batch_size] = preds
             # Change specified number of most salient pixels to substrate pixels

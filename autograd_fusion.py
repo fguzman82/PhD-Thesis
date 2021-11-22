@@ -65,19 +65,19 @@ img_normal1 = transform(original_img_pil1).unsqueeze(0)
 img_normal2 = transform(original_img_pil2).unsqueeze(0)
 img_normal3 = transform(original_img_pil3).unsqueeze(0)
 
-img_batch = torch.cat ((img_normal1, img_normal2, img_normal3))
+img_batch = torch.cat((img_normal3, img_normal3, img_normal3))
 img_batch.requires_grad = False
 img_batch = img_batch.to(device)
 
 org_softmax = torch.nn.Softmax(dim=1)(model(img_batch))  # tensor(3,1000)
-prob_orig = org_softmax.data[[0,1,2],[gt_category1, gt_category2, gt_category3]].cpu().detach().numpy()
+prob_orig = org_softmax.data[[0,1,2],[gt_category3, gt_category3, gt_category3]].cpu().detach().numpy()
 print(prob_orig)
 
 for param in model.parameters():
     param.requires_grad = False
 
 np.random.seed(seed=0)
-mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 224, 224)))
+mask = torch.from_numpy(np.float32(np.random.uniform(0, 0.01, size=(224, 224))))
 mask = mask.expand(3, 1, 224, 224)
 mask = mask.to(device)
 mask.requires_grad = True
@@ -90,16 +90,16 @@ for i in range(max_iterations):
     extended_mask = mask
     extended_mask = extended_mask.expand(3, 3, 224, 224)
     perturbated_input = img_batch.mul(extended_mask) + null_img.mul(1 - extended_mask)
-    perturbated_input = perturbated_input.to(torch.float32)
+    #perturbated_input = perturbated_input.to(torch.float32)
     optimizer.zero_grad()
     outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  #(3,1000)
 
-    preds = outputs[[0, 1, 2],[gt_category1, gt_category2, gt_category3]]
+    preds = outputs[[0, 1, 2],[gt_category3, gt_category3, gt_category3]]
 
-    loss = 1e-4 * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds
+    loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds
     loss.backward(gradient=torch.tensor([1., 1., 1.]).to(device))
     optimizer.step()
-    mask.data.clamp_(0, 1)
+    #mask.data.clamp_(0, 1)
 
 print('Time taken: {:.3f}'.format(time.time() - init_time))
 

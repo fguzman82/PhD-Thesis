@@ -4,6 +4,9 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/generativeimptorch/checkpoints" />
       <excludeFolder url="file://$MODULE_DIR$/output" />
+      <excludeFolder url="file://$MODULE_DIR$/Imagenet" />
+      <excludeFolder url="file://$MODULE_DIR$/val" />
+      <excludeFolder url="file://$MODULE_DIR$/val_bb" />
     </content>
     <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver1)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -64,7 +64,8 @@ if __name__ == '__main__':
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    # gt_category = 565  # freight car
+    gt_category = 732  # camara fotografica
 
     try:
         shutil.rmtree(save_path)
@@ -143,7 +144,8 @@ if __name__ == '__main__':
     # Leer la imágen del archivo
     # original_img = cv2.imread(img_path, 1)
     # img = np.float32(original_img) / 255
-    original_img_pil = Image.open(img_path).convert('RGB')
+    #original_img_pil = Image.open(img_path).convert('RGB')
+    original_img_pil = Image.open('./dataset/0.JPEG').convert('RGB')
     # original_np = np.array(original_img_pil)
 
     # normalización de acuerdo al promedio y desviación std de Imagenet

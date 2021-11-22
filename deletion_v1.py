@@ -54,17 +54,17 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    # img_path = 'perro_gato.jpg'
+    img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    img_path = 'example_2.JPEG'
+    # img_path = 'example_2.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
-    # gt_category = 281  # tabby cat
+    gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    #gt_category = 565  # freight car
 
     try:
         shutil.rmtree(save_path)
@@ -192,8 +192,8 @@ if __name__ == '__main__':
 
         similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
 
-        loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + similarity + factorTV * tv_coeff * tv_norm(mask, tv_beta)
-        #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category]
+        #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + similarity + factorTV * tv_coeff * tv_norm(mask, tv_beta)
+        loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category]
         #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category] + factorTV * tv_coeff * tv_norm(mask,
         #                                                                                                       tv_beta)
 
@@ -212,7 +212,7 @@ if __name__ == '__main__':
         # print('min mask(grad) after clip=', mask_grads.min())
 
         optimizer.step()
-        mask.data.clamp_(0, 1)  # mask tensor (1, 1, 224, 224)
+        #mask.data.clamp_(0, 1)  # mask tensor (1, 1, 224, 224)
 
         # debug visualización de la mascara
         # mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
