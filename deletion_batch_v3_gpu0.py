@@ -209,6 +209,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
     null_img_blur.requires_grad = False
     null_img = null_img_blur.cuda()
 
+
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
 
     for i in trange(max_iterations):
@@ -222,7 +223,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
 
         loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds
         loss.backward(gradient=torch.ones_like(loss).cuda())
-        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
+        #mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         optimizer.step()
         mask.data.clamp_(0, 1)
 

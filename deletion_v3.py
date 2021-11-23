@@ -242,6 +242,8 @@ if __name__ == '__main__':
     # imagen nulla difuminada
     orig_img_blur = original_img_pil.filter(ImageFilter.GaussianBlur(10))
     null_img_blur = transform(orig_img_blur).unsqueeze(0)
+    #orig_img_tensor = transform(original_img_pil).unsqueeze(0)
+    #null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(orig_img_tensor)
     null_img_blur.requires_grad = False
     null_img = null_img_blur.to(device)
 

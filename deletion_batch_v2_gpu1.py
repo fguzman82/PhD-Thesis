@@ -19,6 +19,7 @@ import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+import skimage
 
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
@@ -44,6 +45,8 @@ model = models.googlenet(pretrained=True)
 #model = torch.nn.DataParallel(model, device_ids=[0,1])
 model.cuda()
 model.eval()
+
+print('GPU 1 explicacion ver 2')
 
 img_name_list = []
 with open(text_file, 'r') as f:
@@ -82,6 +85,7 @@ class DataProcessing:
             img = skimage.util.random_noise(np.asarray(img), mode='gaussian',
                                             mean=self.noise_mean, var=self.noise_var,
                                             )  # numpy, dtype=float64,range (0, 1)
+            img = Image.fromarray(np.uint8(img * 255))
 
         img = self.transform(img)
         return img, target, os.path.join(self.data_path, self.img_filenames[index])
@@ -232,7 +236,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
     return mask
 
 batch_size = 50
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[501, 1001])
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[501, 1001], if_noise=1)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
@@ -240,7 +244,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path='./output_v2'
+save_path='./output_v2_noise_0.1'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False

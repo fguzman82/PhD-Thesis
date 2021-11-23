@@ -21,7 +21,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 
-#bibliotecas RISE
+# bibliotecas RISE
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
@@ -41,6 +41,7 @@ def imagenet_label_mappings():
                                for x in f.readlines() if len(x.strip()) > 0}
         return image_label_mapping
 
+
 class DataProcessing:
     def __init__(self, data_path, transform, img_idxs=[0, 1]):
         self.data_path = data_path
@@ -48,9 +49,9 @@ class DataProcessing:
 
         img_list = mask_list[img_idxs[0]:img_idxs[1]]
         self.img_filenames = [os.path.join(data_path, '{}.JPEG'.format(i)) for i in img_list]
-        #print('img filenames=', self.img_filenames)
+        # print('img filenames=', self.img_filenames)
         self.mask_filenames = [os.path.join(results_path, '{}_mask.npy'.format(i)) for i in img_list]
-        #print('mask filenames=', self.mask_filenames)
+        # print('mask filenames=', self.mask_filenames)
 
     def __getitem__(self, index):
         img = Image.open(os.path.join(self.data_path, self.img_filenames[index])).convert('RGB')
@@ -76,6 +77,7 @@ class DataProcessing:
         image_class = get_class(filepath.split('/')[-1])
         return image_class
 
+
 # Plots image from tensor
 def tensor_imshow(inp, title=None, **kwargs):
     """Imshow for Tensor."""
@@ -90,62 +92,45 @@ def tensor_imshow(inp, title=None, **kwargs):
         plt.title(title)
     plt.show()
 
+
 transform_val = transforms.Compose([
-    transforms.Resize((256,256)),
+    transforms.Resize((256, 256)),
     transforms.CenterCrop(224),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225]),
 ])
 
-batch_size = 200
+batch_size = 20
 idx_start = 0
-idx_end = 1000
-#batch_size = 10
+idx_end = 20
+# batch_size = 10
 mask_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[idx_start, idx_end])
-mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24, pin_memory=True)
+mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24,
+                                          pin_memory=True)
 
 torch.cuda.set_device(0)
 model = models.googlenet(pretrained=True)
-model = torch.nn.DataParallel(model, device_ids=[0,1])
+model = torch.nn.DataParallel(model, device_ids=[0, 1])
 model.cuda()
 model.eval()
 
 for p in model.parameters():
     p.requires_grad = False
 
-################################################################
-klen = 11
-ksig = 5
-kern = gkern(klen, ksig)
-# Function that blurs input image
-blur = lambda x: torch.nn.functional.conv2d(x, kern, padding=klen // 2)
-#####################################################################
-
 im_label_map = imagenet_label_mappings()
-deletion = CausalMetric(model, 'del', 224, substrate_fn = torch.zeros_like)
-
 iterator = tqdm(enumerate(mask_loader), total=len(mask_loader), desc='batch')
-#1000 datos // batch_size = 5
-auc_acum = np.empty(idx_end // batch_size)
-
 
 for i, (images, mask, target) in iterator:
-    scores = deletion.evaluate(images, mask.numpy(), batch_size)
-    auc_acum[i] = auc(scores.mean(1))
-    #print(scores.shape)
-
-    # pred = torch.nn.Softmax(dim=1)(model(images.cuda()))
-    # for j, img in enumerate(images):
-    #     target_img = target[j].item()
-    #     pr, cl = torch.topk(pred[j], 1)
-    #     pr = pr.cpu().detach().numpy()[0]
-    #     cl = cl.cpu().detach().numpy()[0]
-    #     title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
-    #     #title = 'target={}'.format(im_label_map.get(target_img))
-    #     tensor_imshow(img, title=title)
-    #     mask_np = mask[j].numpy()
-    #     plt.imshow(mask_np)
-    #     plt.show()
-
-print('puntaje total=', auc_acum.mean())
+    pred = torch.nn.Softmax(dim=1)(model(images.cuda()))
+    for j, img in enumerate(images):
+        target_img = target[j].item()
+        pr, cl = torch.topk(pred[j], 1)
+        pr = pr.cpu().detach().numpy()[0]
+        cl = cl.cpu().detach().numpy()[0]
+        title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
+        # title = 'target={}'.format(im_label_map.get(target_img))
+        tensor_imshow(img, title=title)
+        mask_np = mask[j].numpy()
+        plt.imshow(mask_np)
+        plt.show()

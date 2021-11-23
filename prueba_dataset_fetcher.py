@@ -20,6 +20,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import shutil
+import skimage
 
 val_dir = './val'
 
@@ -49,11 +50,11 @@ class DataProcessing:
         self.transform = transform
         self.if_noise = if_noise
         self.noise_mean = 0
-        self.noise_var = 0.1
+        self.noise_var = 1
 
         img_list = img_name_list[img_idxs[0]:img_idxs[1]]
         self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
-        print('img filenames=', os.path.join(self.img_filenames[0]))
+        #print('img filenames=', os.path.join(self.img_filenames[0]))
 
         #self.img_filenames.sort()
 
@@ -65,6 +66,8 @@ class DataProcessing:
             img = skimage.util.random_noise(np.asarray(img), mode='gaussian',
                                             mean=self.noise_mean, var=self.noise_var,
                                             )  # numpy, dtype=float64,range (0, 1)
+            img = Image.fromarray(np.uint8(img * 255))
+            #print(img2.max(), img2.min())
 
         img = self.transform(img)
         return img, target, os.path.join(self.data_path, self.img_filenames[index])
@@ -109,8 +112,8 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 init_time = time.time()
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 1000])
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=100, shuffle=False, num_workers=24, pin_memory=True)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10], if_noise=1)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=10, shuffle=False, num_workers=24, pin_memory=True)
 
 # especificar cual gpu 0 o 1
 torch.cuda.set_device(0)
@@ -124,21 +127,21 @@ im_label_map = imagenet_label_mappings()
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
 for i, (images, target, path) in iterator:
-    #images = images.cuda()
-    #pred = torch.nn.Softmax(dim=1)(model(images))
-    #target = target.numpy()
+    images = images.cuda()
+    pred = torch.nn.Softmax(dim=1)(model(images))
+    target = target.numpy()
 
-    for i, file in enumerate(path):
+    #for i, file in enumerate(path):
         # print('./dataset/{}.JPEG'.format(i))
-        shutil.copyfile(file, './dataset/{}'.format(file.split('/')[-1]))
+        #shutil.copyfile(file, './dataset/{}'.format(file.split('/')[-1]))
 
-    #for j, img in enumerate(images):
-    #     target_img = target[j].item()
-    #     pr, cl = torch.topk(pred[j], 1)
-    #     pr = pr.cpu().detach().numpy()[0]
-    #     cl = cl.cpu().detach().numpy()[0]
-    #     title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
-    #     tensor_imshow(img.cpu(), title=title)
+    for j, img in enumerate(images):
+        target_img = target[j].item()
+        pr, cl = torch.topk(pred[j], 1)
+        pr = pr.cpu().detach().numpy()[0]
+        cl = cl.cpu().detach().numpy()[0]
+        title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
+        tensor_imshow(img.cpu(), title=title)
 
 
 

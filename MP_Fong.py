@@ -47,19 +47,21 @@ def get_blurred_img(img, radius=10):
 if __name__ == '__main__':
 
 
-    img_path = 'perro_gato.jpg'
+    # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
+    img_path = './dataset/0.JPEG'
     save_path = './output/'
 
-    gt_category = 207  # Golden retriever
+    #gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
     # gt_category = 1 # goldfish, Carassius auratus
+    gt_category = 732  # camara fotografica
 
     try:
         shutil.rmtree(save_path)

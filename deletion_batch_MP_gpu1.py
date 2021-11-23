@@ -19,6 +19,7 @@ import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+from skimage.transform import resize
 
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
@@ -34,10 +35,14 @@ text_file = abs_path(input_dir_path)
 imagenet_class_mappings = './imagenet_class_mappings'
 
 torch.manual_seed(0)
-learning_rate = 0.3
-max_iterations = 301
-l1_coeff = 0.01e-5
+learning_rate = 0.1
 size = 224
+max_iterations = 300
+jitter = 4
+l1_coeff = 1e-4
+tv_beta = 3
+tv_coeff = 1e-2
+thresh = 0.5
 
 torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
@@ -45,7 +50,7 @@ model = models.googlenet(pretrained=True)
 model.cuda()
 model.eval()
 
-print('GPU 1 explicacion ver 3')
+print('GPU 0 explicacion MP')
 
 img_name_list = []
 with open(text_file, 'r') as f:
@@ -108,7 +113,7 @@ class DataProcessing:
 
 transform_val = transforms.Compose([
     transforms.Resize((256, 256)),
-    transforms.CenterCrop(224),
+    transforms.CenterCrop(224+jitter),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225]),
@@ -130,77 +135,22 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 
-list_of_layers = ['conv1',
-                  'conv2',
-                  'conv3',
-                  'inception3a',
-                  'inception3b',
-                  'inception4a',
-                  'inception4b',
-                  'inception4c',
-                  'inception4d',
-                  'inception4e',
-                  'inception5a',
-                  'inception5b',
-                  'fc'
-                  ]
-activation_orig = {}
+upsample = torch.nn.UpsamplingNearest2d(size=(size, size)).to('cuda')
 
+def tv_norm(input, tv_beta):
+    img = input[:, 0, :]
+    row_grad = torch.abs((img[:, :-1, :] - img[:, 1:, :])).pow(tv_beta).sum(dim=(1,2))
+    col_grad = torch.abs((img[:, :, :-1] - img[:, :, 1:])).pow(tv_beta).sum(dim=(1,2))
+    return row_grad + col_grad
 
-def get_activation_orig(name):
-    def hook(model, input, output):
-        activation_orig[name] = output
-
-    return hook
-
-
-def get_activation_mask(name):
-    def hook(model, input, output):
-        act_mask = output
-        # print(act_mask.shape). #debug
-        # print(activation_orig[name].shape) #debug
-        limite_sup = (act_mask <= torch.fmax(torch.tensor(0), activation_orig[name]))
-        limite_inf = (act_mask >= torch.fmin(torch.tensor(0), activation_orig[name]))
-        oper = limite_sup * limite_inf
-        # print('oper shape=',oper.shape). #debug
-        act_mask.requires_grad_(True)
-        act_mask.retain_grad()
-        h = act_mask.register_hook(lambda grad: grad * oper)
-        # x.register_hook(update_gradients(2))
-        # activation[name]=act_mask
-        # h.remove()
-
-    return hook
-
+for param in model.parameters():
+    param.requires_grad = False
 
 def my_explanation(img_batch, max_iterations, gt_category):
 
-    F_hook = []
-    exp_hook = []
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
-
-    # se calculan las activaciones para el batch de imágenes y se almacenan en la lista activation_orig
-    # la funcion "feed forward" registra los hook
-
-    org_softmax = torch.nn.Softmax(dim=1)(model(img_batch))
-
-    # se borran los hook registrados en Feed Forward
-    for fh in F_hook:
-        fh.remove()
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            exp_hook.append(layer.register_forward_hook(get_activation_mask(name)))
-
-    for param in model.parameters():
-        param.requires_grad = True
-
     np.random.seed(seed=0)
-    mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 224, 224)))
-    mask = mask.expand(img_batch.size(0), 1, 224, 224)
+    mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 28, 28)))
+    mask = mask.expand(img_batch.size(0), 1, 28, 28)
     mask = mask.cuda()
     mask.requires_grad = True
 
@@ -212,22 +162,30 @@ def my_explanation(img_batch, max_iterations, gt_category):
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
 
     for i in trange(max_iterations):
-        extended_mask = mask.expand(img_batch.size(0), 3, 224, 224)
-        perturbated_input = img_batch.mul(extended_mask) + null_img.mul(1 - extended_mask)
+
+        if jitter != 0:
+            j1 = np.random.randint(jitter)
+            j2 = np.random.randint(jitter)
+        else:
+            j1 = 0
+            j2 = 0
+
+        upsampled_mask = upsample(mask)
+
+        extended_mask = upsampled_mask.expand(img_batch.size(0), 3, 224, 224)
+        perturbated_input = img_batch[:, :, j1:(size + j1), j2:(size + j2)].mul(extended_mask) + \
+                            null_img[:, :, j1:(size + j1), j2:(size + j2)].mul(1 - extended_mask)
         perturbated_input = perturbated_input.to(torch.float32)
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # (3,1000)
 
         preds = outputs[torch.arange(0, img_batch.size(0)).tolist(), gt_category.tolist()]
 
-        loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds
+        loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds + tv_coeff * tv_norm(mask, tv_beta)
         loss.backward(gradient=torch.ones_like(loss).cuda())
         # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         optimizer.step()
         mask.data.clamp_(0, 1)
-
-    for eh in exp_hook:
-        eh.remove()
 
     #mask_np = (mask.cpu().detach().numpy())
 
@@ -248,7 +206,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path='./output_v3'
+save_path='./output_MP'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False
@@ -258,6 +216,7 @@ for i, (images, target, file_names) in iterator:
 
     for idx, file_name in enumerate(file_names):
         mask_file = ('{}_mask.npy'.format(file_name.split('/')[-1].split('.JPEG')[0]))
-        np.save(os.path.abspath(os.path.join(save_path, mask_file)), 1 - mask_np[idx, 0, :, :])
+        mask_np_idx = resize(np.moveaxis(mask_np[idx, 0, :, :].transpose(), 0, 1), (size, size))
+        np.save(os.path.abspath(os.path.join(save_path, mask_file)), 1 - mask_np_idx)
 
 print('Time taken: {:.3f}'.format(time.time() - init_time))
