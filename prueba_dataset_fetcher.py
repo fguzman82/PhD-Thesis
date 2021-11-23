@@ -50,7 +50,7 @@ class DataProcessing:
         self.transform = transform
         self.if_noise = if_noise
         self.noise_mean = 0
-        self.noise_var = 1
+        self.noise_var = 0.1
 
         img_list = img_name_list[img_idxs[0]:img_idxs[1]]
         self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
@@ -140,7 +140,7 @@ for i, (images, target, path) in iterator:
         pr, cl = torch.topk(pred[j], 1)
         pr = pr.cpu().detach().numpy()[0]
         cl = cl.cpu().detach().numpy()[0]
-        title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
+        title = 'p={:.2f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
         tensor_imshow(img.cpu(), title=title)
 
 

@@ -21,9 +21,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import pytorch_ssim
+from skimage.feature import hog
+from scipy.stats import spearmanr, pearsonr
+from skimage.metrics import structural_similarity as ssim
 
-results_path1 = './output_v2'
-results_path2 = './output_v2_noise_1.0'
+results_path1 = './output_MP'
+results_path2 = './output_MP_noise_1.0'
 
 mask_path1 = os.listdir(results_path1)
 mask_path2 = os.listdir(results_path2)
@@ -74,12 +77,41 @@ mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, s
 
 torch.cuda.set_device(0)
 
-iterator = tqdm(enumerate(mask_loader), total=len(mask_loader), desc='batch')
+# iterator = tqdm(enumerate(mask_loader), total=len(mask_loader), desc='batch')
+#
+# for i, (mask1, mask2) in iterator:
+#     mask1 = mask1.cuda()
+#     mask2 = mask2.cuda()
+#     mask1 = mask1.reshape(mask1.size(0), 1, mask1.size(1), mask1.size(2))
+#     mask2 = mask2.reshape(mask2.size(0), 1, mask2.size(1), mask2.size(2))
+#     print('SSIM = ', pytorch_ssim.ssim(mask1, mask2).cpu().numpy())
+#     # print('SSIM = ', pytorch_ssim.ssim(mask1, mask2, size_average = False).cpu().numpy())
 
-for i, (mask1, mask2) in iterator:
-    mask1 = mask1.cuda()
-    mask2 = mask2.cuda()
-    mask1 = mask1.reshape(mask1.size(0), 1, mask1.size(1), mask1.size(2))
-    mask2 = mask2.reshape(mask2.size(0), 1, mask2.size(1), mask2.size(2))
-    print('SSIM = ', pytorch_ssim.ssim(mask1, mask2).cpu().numpy())
-    # print('SSIM = ', pytorch_ssim.ssim(mask1, mask2, size_average = False).cpu().numpy())
+fong0 = np.load('fong_0.0.npy')
+fong1 = np.load('fong_0.05.npy')
+fong2 = np.load('fong_0.1.npy')
+
+fong_A = torch.from_numpy(np.stack((fong0, fong0)).reshape(2, 1, 224, 224))
+fong_B = torch.from_numpy(np.stack((fong1, fong2)).reshape(2, 1, 224, 224))
+
+print('SSIM (Fong) = ', pytorch_ssim.ssim(fong_A, fong_B))
+
+fabio0 = np.load('v4_0.0.npy')
+fabio1 = np.load('v4_0.05.npy')
+fabio2 = np.load('v4_0.1.npy')
+
+fabio_A = torch.from_numpy(np.stack((fabio0, fabio0)).reshape(2, 1, 224, 224))
+fabio_B = torch.from_numpy(np.stack((fabio1, fabio2)).reshape(2, 1, 224, 224))
+
+print('SSIM (Fabio) = ', pytorch_ssim.ssim(fabio_A, fabio_B))
+
+hog0, hog_img0 = hog(fabio1, pixels_per_cell=(16, 16), visualize=True)
+hog1, hog_img1 = hog(fabio2, pixels_per_cell=(16, 16), visualize=True)
+out, _ = pearsonr(hog0, hog1)
+print('pearson', out)
+
+out, _ = spearmanr(fabio1, fabio2, axis=None)
+print('spearman', out)
+
+out = ssim(fabio1, fabio2, data_range=1, win_size=5)
+print('ssim =', out)

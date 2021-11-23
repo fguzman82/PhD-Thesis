@@ -12,6 +12,8 @@ from formal_utils import *
 from skimage.transform import resize
 from PIL import ImageFilter, Image
 import shutil
+import skimage
+import torchvision.transforms as transforms
 
 use_cuda = torch.cuda.is_available()
 
@@ -44,24 +46,25 @@ def get_blurred_img(img, radius=10):
     return np.array(blurred_img) / float(255)
 
 
+
 if __name__ == '__main__':
 
 
-    # img_path = 'perro_gato.jpg'
+    img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
-    # img_path = './dataset/0.JPEG'
+    #img_path = './dataset/0.JPEG'
     save_path = './output/'
 
     #gt_category = 207  # Golden retriever
-    # gt_category = 281  # tabby cat
+    gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
     # gt_category = 1 # goldfish, Carassius auratus
-    gt_category = 732  # camara fotografica
+    # gt_category = 732  # camara fotografica
 
     try:
         shutil.rmtree(save_path)
@@ -73,6 +76,7 @@ if __name__ == '__main__':
     perturb_binary = 0
     learning_rate = 0.1  # poca robustez *2 *3
     size = 224
+    noise = 0.1
 
     max_iterations = 300
     jitter = 4
@@ -86,25 +90,34 @@ if __name__ == '__main__':
     # PyTorch random seed
     torch.manual_seed(0)
 
+    transform = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.CenterCrop(224+jitter),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225]),
+    ])
 
+    label_map = load_imagenet_label_map()
 
-    if dataset == 'imagenet':
-        model = load_model(arch_name='resnet50')
-
-        # load the class label
-        label_map = load_imagenet_label_map()
-
-    elif dataset == 'places365':
-        model = load_model_places365(arch_name='resnet50')
-
-        # load the class label
-        label_map = load_class_label()
-
-    else:
-        print('Invalid datasest!!')
-        exit(0)
+    # if dataset == 'imagenet':
+    #     model = load_model(arch_name='resnet50')
+    #
+    #     # load the class label
+    #     label_map = load_imagenet_label_map()
+    #
+    # elif dataset == 'places365':
+    #     model = load_model_places365(arch_name='resnet50')
+    #
+    #     # load the class label
+    #     label_map = load_class_label()
+    #
+    # else:
+    #     print('Invalid datasest!!')
+    #     exit(0)
 
     #model = torch.nn.DataParallel(model).to('cuda')
+    model = models.googlenet(pretrained=True)
     model.to('cuda')
     model.eval()
 
@@ -127,38 +140,49 @@ if __name__ == '__main__':
     init_time = time.time()
 
     # Read image
-    original_img = cv2.imread(img_path, 1)
+    original_img_pil = Image.open(img_path).convert('RGB')
+    img_noise_np = skimage.util.random_noise(np.asarray(original_img_pil), mode='gaussian',
+                                             mean=0, var=noise,
+                                             )  # numpy, dtype=float64,range (0, 1)
+    img_noise = Image.fromarray(np.uint8(img_noise_np * 255))
 
-    shape = original_img.shape
-    img_orig = np.float32(original_img) / 255
+    # se normaliza la imágen y se agrega una dimensión [1,3,244,244]
+    img_normal = transform(img_noise).unsqueeze(0)  # Tensor (1, 3, 224, 224)
+    img_normal.requires_grad = False
+    img_normal = img_normal.cuda()
+
+    cat_orig = label_map[gt_category]
 
     # Path to the output folder
     save_path = os.path.join(save_path, '{}'.format(algo), '{}'.format(dataset))
     mkdir_p(os.path.join(save_path))
 
     # Compute original output
-    org_softmax = torch.nn.Softmax(dim=1)(model(preprocess_image(img_orig, size)))
-    eval0 = org_softmax.data[0, gt_category]
-    pill_transf = get_pil_transform()
+    org_softmax = torch.nn.Softmax(dim=1)(model(img_normal))  # tensor(1,1000)
+    prob_orig = org_softmax.data[0, gt_category].cpu().detach().numpy()
+
     o_img_path = os.path.join(save_path, 'real_{}_{:.3f}_image.jpg'
-                              .format(label_map[gt_category].split(',')[0].split(' ')[0].split('-')[0], eval0))
-    cv2.imwrite(os.path.abspath(o_img_path), cv2.cvtColor(np.array(pill_transf(get_image(img_path))), cv2.COLOR_BGR2RGB))
+                              .format(cat_orig.split(',')[0].split(' ')[0].split('-')[0], prob_orig))
 
-    # Convert to torch variables
-    img = preprocess_image(img_orig, size + jitter)
+    # visualización de tensor normalizado a array y desrnomalizado
+    img_transform_T = np.moveaxis(img_normal[0, :].cpu().detach().numpy().transpose(), 0, 1)  # array (224,224,3)
+    img_unormalize = np.uint8(255 * unnormalize(img_transform_T))  # array (224,224,3)
+    Image.fromarray(img_unormalize).save(o_img_path, 'JPEG')
 
-    if use_cuda:
-        img = img.to('cuda')
+    print('probabilidad original para ', cat_orig, '=', prob_orig)
 
+    img = img_normal
     # Modified
     if mask_init == 'random':
         np.random.seed(seed=0)
         mask = np.random.rand(28, 28)
         mask = numpy_to_torch(mask)
 
-
-    if algo == 'MP':
-        null_img = preprocess_image(get_blurred_img(np.float32(original_img), radius=10), size + jitter)
+    # imagen nulla difuminada
+    orig_img_blur = original_img_pil.filter(ImageFilter.GaussianBlur(5))
+    null_img_blur = transform(orig_img_blur).unsqueeze(0)
+    null_img_blur.requires_grad = False
+    null_img = null_img_blur.cuda()
 
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
 
@@ -212,13 +236,23 @@ if __name__ == '__main__':
 
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (28, 28)
     mask_np = resize(np.moveaxis(mask_np.transpose(), 0, 1),(size, size))
+    plt.title('noise = {}'.format(noise))
     plt.imshow(1 - mask_np)  # 1-mask para deletion
     plt.show()
 
-    img_eval = preprocess_image(img_orig, 224).cpu()
+    transform_eval = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225]),
+    ])
+
+
+    img_eval = transform_eval(original_img_pil).unsqueeze(0)
 
     deletion = CausalMetric(model, 'del', 224, substrate_fn=torch.zeros_like)
-    h = deletion.single_run(img_eval, (1. - mask_np), verbose=1)
+    h = deletion.single_run(img_eval, (1. - mask_np), verbose=0)
     print('deletion score: ', auc(h))
 
     klen = 11
@@ -228,8 +262,9 @@ if __name__ == '__main__':
     blur = lambda x: torch.nn.functional.conv2d(x, kern, padding=klen // 2)
 
     insertion = CausalMetric(model, 'ins', 224, substrate_fn=blur)
-    h = insertion.single_run(img_eval, (1. - mask_np), verbose=1)
+    h = insertion.single_run(img_eval, (1. - mask_np), verbose=0)
     print('insertion score: ', auc(h))
 
+    np.save('fong_{}.npy'.format(noise), (1. - mask_np))
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))

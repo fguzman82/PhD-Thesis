@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 from torchvision import models
 import torchvision.transforms as transforms
+import skimage
 
 use_cuda = torch.cuda.is_available()
 
@@ -54,7 +55,7 @@ def inpainter(img, mask):
         #print("Resume from {} at iteration {}".format(checkpoint_path, model_iteration))
 
         if cuda:
-            netG = torch.nn.parallel.DataParallel(netG, device_ids=[0, 1])
+            #netG = torch.nn.parallel.DataParallel(netG, device_ids=[0, 1])
             netG.cuda()
             x = x.cuda()
             mask = mask.cuda()
@@ -107,6 +108,7 @@ if __name__ == '__main__':
     # img_path = 'example.JPEG'
     img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
+    # img_path = './dataset/0.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
@@ -115,6 +117,7 @@ if __name__ == '__main__':
     # gt_category = 282  # tigger cat
     gt_category = 565  # freight car
     # gt_category = 1 # goldfish, Carassius auratus
+    # gt_category = 732  # camara fotografica
 
     try:
         shutil.rmtree(save_path)
@@ -124,14 +127,15 @@ if __name__ == '__main__':
     # PyTorch random seed
     torch.manual_seed(0)
 
-    learning_rate = 0.3  # 0.1 (preservation sparser) 0.3 (preservation dense)
-    max_iterations = 130
-    l1_coeff = 0.01e-5  # 1e-4 (preservation)
+    learning_rate = 0.1*0.8  # orig (0.3) 0.1 (preservation sparser) 0.3 (preservation dense)
+    max_iterations = 228 #130 *2
+    l1_coeff = 0.01e-5*2  # *2 *4 *0.5 (robusto)
     size = 224
+    noise = 0.0
 
     tv_beta = 3
     tv_coeff = 1e-2
-    factorTV = 0 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+    factorTV = 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -200,11 +204,16 @@ if __name__ == '__main__':
     # original_img = cv2.imread(img_path, 1)
     # img = np.float32(original_img) / 255
     original_img_pil = Image.open(img_path).convert('RGB')
-    original_np = np.array(original_img_pil)
+    #original_np = np.array(original_img_pil)
+
+    img_noise_np = skimage.util.random_noise(np.asarray(original_img_pil), mode='gaussian',
+                                    mean=0, var=noise,
+                                    )  # numpy, dtype=float64,range (0, 1)
+    img_noise = Image.fromarray(np.uint8(img_noise_np * 255))
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize((256, 256)),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -212,7 +221,7 @@ if __name__ == '__main__':
     ])
 
     # se normaliza la imágen y se agrega una dimensión [1,3,244,244]
-    img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
+    img_normal = transform(img_noise).unsqueeze(0)  # Tensor (1, 3, 224, 224)
     img_normal.requires_grad = False
     img_normal = img_normal.to(device)
 
@@ -290,11 +299,11 @@ if __name__ == '__main__':
             layer.register_backward_hook(get_act_mask_gradients(name))
 
     for param in model.parameters():
-        param.requires_grad = True
+        param.requires_grad = False
 
     img = img_normal  # tensor (1, 3, 224, 224)
     np.random.seed(seed=0)
-    mask = np.random.uniform(0, 0.01, size=(224, 224))  # array (224, 224)  generation
+    mask = np.random.uniform(0, 0.01, size=(224, 224))  # 224, 168, 112 robusto - generation
     # mask = np.random.rand(224, 224)
     # mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
     mask = numpy_to_torch(mask)  # tensor (1, 1, 224, 224)
@@ -320,8 +329,8 @@ if __name__ == '__main__':
     pred_mask_np = np.empty((max_iterations, 1))
 
     for i in range(max_iterations):
-        #upsampled_mask = upsample(mask)
-        upsampled_mask = mask
+        upsampled_mask = upsample(mask)
+        #upsampled_mask = mask
 
         # The single channel mask is used with an RGB image,
         # so the mask is duplicated to have 3 channel,
@@ -365,7 +374,7 @@ if __name__ == '__main__':
         # print('min mask(grad)=', mask_grads.min())
         # torch.nn.utils.clip_grad_norm_(mask, 1, norm_type=float('inf'))
 
-        mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
+        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         # torch.nn.utils.clip_grad_norm_(mask, 1)
 
         # mask_grads = np.squeeze(mask.grad.data.cpu().numpy())
@@ -451,16 +460,14 @@ if __name__ == '__main__':
     print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
 
     plt.plot(loss_np)
-    #plt.title('loss')
     plt.ylabel('loss')
     plt.xlabel('# iter')
     plt.show()
 
-    plt.plot(pred_mask_np)
-    # plt.title('loss')
-    plt.ylabel('prob')
-    plt.xlabel('# iter')
-    plt.show()
+    # plt.plot(pred_mask_np)
+    # plt.ylabel('prob')
+    # plt.xlabel('# iter')
+    # plt.show()
 
 
 
@@ -468,6 +475,8 @@ if __name__ == '__main__':
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
+    mask_np = resize(np.moveaxis(mask_np.transpose(), 0, 1), (size, size))
+    plt.title('noise = {}'.format(noise))
     plt.imshow(1-mask_np)  # 1-mask para deletion
     plt.show()
 
@@ -497,3 +506,5 @@ if __name__ == '__main__':
     org_softmax = torch.nn.Softmax(dim=1)(model(img_masked.to(device)))
     prob_orig = org_softmax.data[0, gt_category].cpu().detach().numpy()
     print('probabilidad de la mascara complemento=', prob_orig)
+
+    np.save('v4_{}.npy'.format(noise), (1. - mask_np))

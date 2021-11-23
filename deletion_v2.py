@@ -79,12 +79,10 @@ if __name__ == '__main__':
     l1_coeff = 0.01e-5  # 1e-4 (preservation)
     size = 224
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     # model = models.vgg16(pretrained=True)
     # model = models.resnet50(pretrained=True)
     model = models.googlenet(pretrained=True)
-    model.to(device)
+    model.to('cuda')
     # evaluar el modelo para que sea deterministico
     model.eval()
 
@@ -147,7 +145,7 @@ if __name__ == '__main__':
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize((256, 256)),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -157,7 +155,7 @@ if __name__ == '__main__':
     # se normaliza la imágen y se agrega una dimensión [1,3,244,244]
     img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
     img_normal.requires_grad = False
-    img_normal = img_normal.to(device)
+    img_normal = img_normal.cuda()
 
     cat_orig = label_map[gt_category]
     print('explicacion para: ', cat_orig)
@@ -165,6 +163,7 @@ if __name__ == '__main__':
     # Path to the output folder
     save_path = os.path.join(save_path, 'MP', 'imagenet')
     mkdir_p(os.path.join(save_path))
+
 
     # Compute original output
     # org_softmax = torch.nn.Softmax(dim=1)(model(preprocess_image(img, size)))
@@ -243,7 +242,7 @@ if __name__ == '__main__':
     #mask = mask.to(device)
     #mask.requires_grad = True
 
-    null_img = torch.zeros(1, 3, size, size).to(device)  # tensor (1, 3, 224, 224)
+    null_img = torch.zeros(1, 3, size, size).cuda()  # tensor (1, 3, 224, 224)
 
     # Definición del tipo de optimizador
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
@@ -389,6 +388,6 @@ if __name__ == '__main__':
     # plt.imshow(img_pert_unnorma)
     # plt.show()
 
-    org_softmax = torch.nn.Softmax(dim=1)(model(img_masked.to(device)))
+    org_softmax = torch.nn.Softmax(dim=1)(model(img_masked.cuda()))
     prob_orig = org_softmax.data[0, gt_category].cpu().detach().numpy()
     print('probabilidad de la mascara complemento=', prob_orig)
