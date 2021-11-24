@@ -54,15 +54,15 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    # img_path = 'perro_gato.jpg'
-    img_path = 'dog.jpg'
+    img_path = 'perro_gato.jpg'
+    # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     save_path = './output/'
 
-    # gt_category = 207  # Golden retriever
+    gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
-    gt_category = 258  # "Samoyed, Samoyede"
+    # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
 
@@ -75,8 +75,8 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
-    max_iterations = 501
-    l1_coeff = 1e-4
+    max_iterations = 301
+    l1_coeff = 1e-3
     size = 224
 
     tv_beta = 3
@@ -122,10 +122,10 @@ if __name__ == '__main__':
     original_img_pil = Image.open(img_path).convert('RGB')
 
     # voy a agregar un poco de ruido a la imagen
-    width, height = original_img_pil.size
-    noise_img = Image.effect_noise((width, height), 25)
-    noise_img_3 = Image.merge('RGB', (noise_img, noise_img, noise_img))
-    img_sum = Image.blend(original_img_pil, noise_img_3, 0.5)
+    #width, height = original_img_pil.size
+    #noise_img = Image.effect_noise((width, height), 25)
+    #noise_img_3 = Image.merge('RGB', (noise_img, noise_img, noise_img))
+    #img_sum = Image.blend(original_img_pil, noise_img_3, 0.5)
 
     #original_np = np.array(img_sum)
     #plt.imshow(original_np)
@@ -141,7 +141,7 @@ if __name__ == '__main__':
     ])
 
     # se normaliza la imágen y se agrega una dimensión [1,3,244,244]
-    img_normal = transform(img_sum).unsqueeze(0)  # Tensor (1, 3, 224, 224)
+    img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
     img_normal.requires_grad = False
     img_normal = img_normal.to(device)
 
@@ -173,9 +173,8 @@ if __name__ == '__main__':
 
     img = img_normal  # tensor (1, 3, 224, 224)
     np.random.seed(seed=0)
-    mask = np.random.uniform(0, 0.01, size=(224, 224))  # array (224, 224)  generation
     # mask = np.random.rand(224, 224)
-    # mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
+    mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
     mask = numpy_to_torch(mask)  # tensor (1, 1, 224, 224)
 
     null_img = torch.zeros(1, 3, size, size).to(device)  # tensor (1, 3, 224, 224)
@@ -188,6 +187,8 @@ if __name__ == '__main__':
     #                       lr=learning_rate,
     #                       momentum=momentum,
     #                       dampening=momentum)
+    loss_np = np.empty((max_iterations, 1))
+    pred_mask_np = np.empty((max_iterations, 1))
 
     for i in range(max_iterations):
         # upsampled_mask = upsample(mask)
@@ -212,7 +213,7 @@ if __name__ == '__main__':
 
         #mejor para defensa, solo depende de la predicción de la categoria a defender
         #más un poco de regularización de variación total (TV)
-        loss = l1_coeff * torch.sum(torch.abs(mask)) - outputs[0, gt_category] + factorTV * tv_coeff * tv_norm(mask,
+        loss = l1_coeff * torch.sum(torch.abs(mask)) - (outputs[0, gt_category]) + factorTV * tv_coeff * tv_norm(mask,
                                                                                                   tv_beta)
 
         #depende de la calidad de la imagen de entrada porque depende del puntaje original
@@ -275,6 +276,10 @@ if __name__ == '__main__':
         # plt.imshow(mask_np)
         # plt.show()
         # DEBUG
+        pred_mask = outputs[0, gt_category].cpu().detach().numpy()
+        loss_np[i] = loss.cpu().detach().numpy()
+        pred_mask_np[i] = pred_mask
+
 
         if (i % 20) == 0:
             # Save intermediate steps
@@ -304,6 +309,18 @@ if __name__ == '__main__':
     # plt.imshow(up_mask_np[0, 0, :])
     # plt.show()
     print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
+
+    plt.plot(loss_np)
+    # plt.title('loss')
+    plt.ylabel('loss')
+    plt.xlabel('# iter')
+    plt.show()
+
+    plt.plot(pred_mask_np)
+    # plt.title('loss')
+    plt.ylabel('prob')
+    plt.xlabel('# iter')
+    plt.show()
 
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)

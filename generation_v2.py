@@ -53,17 +53,17 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    # img_path = 'perro_gato.jpg'
-    img_path = 'dog.jpg'
+    #img_path = 'perro_gato.jpg'
+    #img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    # img_path = 'example_2.JPEG'
+    img_path = 'example_2.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
-    gt_category = 258  # "Samoyed, Samoyede"
+    # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    # gt_category = 565  # freight car
+    gt_category = 565  # freight car
 
     try:
         shutil.rmtree(save_path)
@@ -74,8 +74,8 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
-    max_iterations = 501
-    l1_coeff = 1e-8#1e-6 #2*0.5*1e-7    # 1e-4 (preservation)
+    max_iterations = 301
+    l1_coeff = 2*1e-7    # 1e-4 (preservation)
     size = 224
 
     tv_beta = 3
@@ -278,7 +278,7 @@ if __name__ == '__main__':
         #                                                                                          tv_beta)  # tensor
 
         #loss = l1_coeff * torch.sum(torch.abs(1 - mask)) + outputs[0, gt_category]
-        # loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity
+        #loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity
         loss = l1_coeff * torch.sum(torch.abs(mask)) - (outputs[0, gt_category])
 
         loss.backward()

@@ -54,17 +54,17 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    # img_path = 'perro_gato.jpg'
+    img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    img_path = 'example_2.JPEG'
+    # img_path = 'example_2.JPEG'
     save_path = './output/'
 
     ## gt_category = 207  # Golden retriever
-    # gt_category = 281  # tabby cat
+    gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    #gt_category = 565  # freight car
 
     try:
         shutil.rmtree(save_path)
@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -229,7 +229,7 @@ if __name__ == '__main__':
             layer.register_backward_hook(get_act_mask_gradients(name))
 
     for param in model.parameters():
-        param.requires_grad = True
+        param.requires_grad = False
 
     img = img_normal  # tensor (1, 3, 224, 224)
     np.random.seed(seed=0)
@@ -238,20 +238,10 @@ if __name__ == '__main__':
     # mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
     mask = numpy_to_torch(mask)  # tensor (1, 1, 224, 224)
 
-    #mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 224, 224)))
-    #mask = mask.to(device)
-    #mask.requires_grad = True
-
     null_img = torch.zeros(1, 3, size, size).cuda()  # tensor (1, 3, 224, 224)
 
     # Definición del tipo de optimizador
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
-    # optimizer = torch.optim.SGD([mask], lr=learning_rate, momentum = 0.9)
-    # momentum = 0.9
-    # optimizer = torch.optim.SGD([mask],
-    #                       lr=learning_rate,
-    #                       momentum=momentum,
-    #                       dampening=momentum)
 
     for i in range(max_iterations):
         # upsampled_mask = upsample(mask)
@@ -262,7 +252,7 @@ if __name__ == '__main__':
         # upsampled_mask = mask
 
         perturbated_input = img.mul(upsampled_mask) + null_img.mul(1 - upsampled_mask)
-        perturbated_input = perturbated_input.to(torch.float32)
+        #perturbated_input = perturbated_input.to(torch.float32)
 
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # tensor (1, 1000)

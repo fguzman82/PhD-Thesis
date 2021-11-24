@@ -106,18 +106,18 @@ if __name__ == '__main__':
     # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    img_path = 'example_2.JPEG'
+    # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
-    # img_path = './dataset/0.JPEG'
+    img_path = './dataset/0.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    # gt_category = 565  # freight car
     # gt_category = 1 # goldfish, Carassius auratus
-    # gt_category = 732  # camara fotografica
+    gt_category = 732  # camara fotografica
 
     try:
         shutil.rmtree(save_path)
@@ -135,7 +135,7 @@ if __name__ == '__main__':
 
     tv_beta = 3
     tv_coeff = 1e-2
-    factorTV = 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+    factorTV = 0.0 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -336,9 +336,9 @@ if __name__ == '__main__':
         # so the mask is duplicated to have 3 channel,
         upsampled_mask = upsampled_mask.expand(1, 3, upsampled_mask.size(2),
                                                upsampled_mask.size(3))  # tensor (1, 3, 224, 224)
-        test_max = upsampled_mask[:, 0:1, :, :]
+        #test_max = upsampled_mask[:, 0:1, :, :]
 
-        img_inpainted = inpainter(img, test_max)
+        img_inpainted = inpainter(img, mask)
         img_inpainted = transforms.Normalize(mean=-1, std=2)(img_inpainted)
         img_inpainted = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225])(img_inpainted)

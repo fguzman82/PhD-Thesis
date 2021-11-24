@@ -3,6 +3,7 @@ import os
 import random
 import shutil
 import time
+import sys
 import warnings
 from srblib import abs_path
 from PIL import ImageFilter, Image
@@ -25,6 +26,11 @@ import skimage
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
+# bibliotecas inpainter
+sys.path.insert(0, './generativeimptorch')
+from utils.tools import get_config, get_model_list
+from model.networks import Generator
+
 val_dir = './val'
 
 imagenet_val_xml_path = './val_bb'
@@ -35,18 +41,56 @@ text_file = abs_path(input_dir_path)
 imagenet_class_mappings = './imagenet_class_mappings'
 
 torch.manual_seed(0)
-learning_rate = 0.3
-max_iterations = 301
-l1_coeff = 0.01e-5
+learning_rate = 0.1 * 0.8  # orig (0.3) 0.1 (preservation sparser) 0.3 (preservation dense)
+max_iterations = 228  # 130 *2
+l1_coeff = 0.01e-5 * 2  # *2 *4 *0.5 (robusto)
 size = 224
+noise = 0.05
+
+tv_beta = 3
+tv_coeff = 1e-2
+factorTV = 0* 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+
+def inpainter(img, mask):
+    config = get_config('./generativeimptorch/configs/config.yaml')
+    checkpoint_path = os.path.join('./generativeimptorch/checkpoints',
+                                   config['dataset_name'],
+                                   config['mask_type'] + '_' + config['expname'])
+    cuda = config['cuda']
+    device_ids = config['gpu_ids']
+
+    with torch.no_grad():  # enter no grad context
+        # Test a single masked image with a given mask
+        x = img
+        # denormaliza imagenet y se normaliza a inpainter [-1,1] mean=0.5, std=0.5
+        x = transforms.Normalize(mean=[0.015 / 0.229, 0.044 / 0.224, 0.094 / 0.225],
+                                 std=[0.5 / 0.229, 0.5 / 0.224, 0.5 / 0.225])(x)
+        x = x * (mask)
+        # Define the trainer
+        netG = Generator(config['netG'], cuda, device_ids)
+        # Resume weight
+        last_model_name = get_model_list(checkpoint_path, "gen", iteration=0)
+        netG.load_state_dict(torch.load(last_model_name))
+
+        #netG = torch.nn.parallel.DataParallel(netG, device_ids=[0, 1])
+        netG.cuda()
+        # Inference
+        x1, x2, offset_flow = netG(x, (1.-mask))
+
+    return x2
+
+def tv_norm(input, tv_beta):
+    img = input[:, 0, :]
+    row_grad = torch.abs((img[:, :-1, :] - img[:, 1:, :])).pow(tv_beta).sum(dim=(1, 2))
+    col_grad = torch.abs((img[:, :, :-1] - img[:, :, 1:])).pow(tv_beta).sum(dim=(1, 2))
+    return row_grad + col_grad
 
 torch.cuda.set_device(0)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
-#model = torch.nn.DataParallel(model, device_ids=[0,1])
 model.cuda()
 model.eval()
 
-print('GPU 0 explicacion ver 2')
+print('GPU 0 explicacion ver 4')
 
 img_name_list = []
 with open(text_file, 'r') as f:
@@ -66,12 +110,12 @@ im_label_map = imagenet_label_mappings()
 
 
 class DataProcessing:
-    def __init__(self, data_path, transform, img_idxs=[0, 1], if_noise=0):
+    def __init__(self, data_path, transform, img_idxs=[0, 1], if_noise=0, noise_var=0.0):
         self.data_path = data_path
         self.transform = transform
         self.if_noise = if_noise
         self.noise_mean = 0
-        self.noise_var = 1.0
+        self.noise_var = noise_var
 
         img_list = img_name_list[img_idxs[0]:img_idxs[1]]
         self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
@@ -198,45 +242,59 @@ def my_explanation(img_batch, max_iterations, gt_category):
             exp_hook.append(layer.register_forward_hook(get_activation_mask(name)))
 
     for param in model.parameters():
-        param.requires_grad = True
+        param.requires_grad = False
 
     np.random.seed(seed=0)
-    mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 224, 224)))
+    mask = torch.from_numpy(np.float32(np.random.uniform(0, 0.01, size=(1, 1, 224, 224))))
     mask = mask.expand(img_batch.size(0), 1, 224, 224)
     mask = mask.cuda()
     mask.requires_grad = True
 
-    null_img = torch.zeros(img_batch.size(0), 3, 224, 224).cuda()
+    #null_img = torch.zeros(img_batch.size(0), 3, 224, 224).cuda()
+    #null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img_batch)
+    #null_img_blur.requires_grad = False
+    #null_img = null_img_blur.cuda()
+
+
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
 
     for i in trange(max_iterations):
         extended_mask = mask.expand(img_batch.size(0), 3, 224, 224)
-        perturbated_input = img_batch.mul(extended_mask) + null_img.mul(1 - extended_mask)
-        perturbated_input = perturbated_input.to(torch.float32)
+
+        img_inpainted = inpainter(img_batch, mask)
+        img_inpainted = transforms.Normalize(mean=-1, std=2)(img_inpainted)
+        img_inpainted = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                             std=[0.229, 0.224, 0.225])(img_inpainted)
+
+        perturbated_input = img_batch.mul(extended_mask) + img_inpainted.mul(1 - extended_mask)
+        #perturbated_input = perturbated_input.to(torch.float32)
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # (3,1000)
 
         preds = outputs[torch.arange(0, img_batch.size(0)).tolist(), gt_category.tolist()]
 
-        loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds
+        loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds + \
+               factorTV * tv_coeff * tv_norm(mask, tv_beta)
+
         loss.backward(gradient=torch.ones_like(loss).cuda())
-        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         optimizer.step()
         mask.data.clamp_(0, 1)
 
     for eh in exp_hook:
         eh.remove()
 
-    #mask_np = (mask.cpu().detach().numpy())
+    mask_np = (mask.cpu().detach().numpy())
 
-    #for i in range(mask_np.shape[0]):
-    #    plt.imshow(1 - mask_np[i, 0, :, :])
-    #    plt.show()
+    for i in range(mask_np.shape[0]):
+        plt.imshow(1 - mask_np[i, 0, :, :])
+        plt.show()
 
     return mask
 
-batch_size = 50
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=0)
+#batch_size = 50
+batch_size = 25
+#val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 500], if_noise=0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=1, noise_var=0.05)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
@@ -244,7 +302,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path='./output_v2_noise_1.0'
+save_path='./output_v4_sintv_0.05'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False

@@ -64,7 +64,7 @@ if __name__ == '__main__':
     gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    #gt_category = 565  # freight car
+    # gt_category = 565  # freight car
 
     try:
         shutil.rmtree(save_path)
@@ -74,9 +74,9 @@ if __name__ == '__main__':
     # PyTorch random seed
     torch.manual_seed(0)
 
-    learning_rate = 0.1  # 0.1 (preservation sparser) 0.3 (preservation dense)
+    learning_rate = 0.2  # 0.1 (preservation sparser) 0.3 (preservation dense)
     max_iterations = 301
-    l1_coeff = 1e-4#5*1e-6  # 1e-4 (preservation)
+    l1_coeff = 1e-5*0.5
     size = 224
 
     tv_beta = 3
@@ -91,21 +91,6 @@ if __name__ == '__main__':
     model.to(device)
     # evaluar el modelo para que sea deterministico
     model.eval()
-
-    list_of_layers = ['conv1',
-                      'conv2',
-                      'conv3',
-                      'inception3a',
-                      'inception3b',
-                      'inception4a',
-                      'inception4b',
-                      'inception4c',
-                      'inception4d',
-                      'inception4e',
-                      'inception5a',
-                      'inception5b',
-                      'fc'
-                      ]
 
     label_map = load_imagenet_label_map()
     # model = torch.nn.DataParallel(model).to('cuda')
@@ -161,9 +146,9 @@ if __name__ == '__main__':
 
     img = img_normal  # tensor (1, 3, 224, 224)
     np.random.seed(seed=0)
-    mask = np.random.uniform(0, 0.01, size=(224, 224))  # array (224, 224)  generation
-    # mask = np.random.rand(224, 224)
-    # mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
+    #mask = np.random.uniform(0, 0.01, size=(224, 224))  # array (224, 224)  generation
+    mask = np.random.rand(224, 224)
+    #mask = np.random.uniform(0.99, 1, size=(224, 224))  # array (224, 224)  preservation
     mask = numpy_to_torch(mask)  # tensor (1, 1, 224, 224)
 
     null_img = torch.zeros(1, 3, size, size).to(device)  # tensor (1, 3, 224, 224)
@@ -212,45 +197,13 @@ if __name__ == '__main__':
         # print('min mask(grad) after clip=', mask_grads.min())
 
         optimizer.step()
-        #mask.data.clamp_(0, 1)  # mask tensor (1, 1, 224, 224)
-
-        # debug visualización de la mascara
-        # mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
-        # plt.imshow(1 - mask_np)  # 1-mask para deletion
-        # plt.title("mask value")
-        # plt.show()
-
-        # debug visualización del gradiente de la mask
-        # maskgrads_np = np.squeeze(mask.grad.data.cpu().numpy())
-        # plt.imshow(maskgrads_np)
-        # plt.title("mask grad")
-        # plt.show()
+        mask.data.clamp_(0, 1)  # mask tensor (1, 1, 224, 224)
 
 
-        # control
-        # upsampled_mask_control = mask.expand(1, 3, mask.size(2), mask.size(3))  # tensor (1, 3, 224, 224)
-        # up_mask_np = upsampled_mask_control.cpu().detach().numpy()
 
         # Create save_path for storing intermediate steps
         path = os.path.join(save_path, 'intermediate_steps')
         mkdir_p(path)
-
-        # DEBUG
-        # mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
-        # print('max mask=', mask_np.max())
-        # print('min mask=', mask_np.min())
-        # mask_grads=np.squeeze(mask.grad.data.cpu().numpy())
-        # print('max mask(grad)=', mask_grads.max())
-        # print('min mask(grad)=', mask_grads.min())
-
-        # torch.nn.utils.clip_grad_norm_(mask, 1)
-
-        # mask_grads = np.squeeze(mask.grad.data.cpu().numpy())
-        # print('max mask(grad) after clip=', mask_grads.max())
-        # print('min mask(grad) after clip=', mask_grads.min())
-        # plt.imshow(mask_np)
-        # plt.show()
-        # DEBUG
 
         if (i % 20) == 0:
             # Save intermediate steps

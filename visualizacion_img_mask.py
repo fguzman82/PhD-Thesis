@@ -25,13 +25,20 @@ from tqdm import tqdm, trange
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './output_MP'
+results_path = './output_MP_0.1'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
+input_dir_path = 'images_list.txt'
+text_file = abs_path(input_dir_path)
 
 mask_filenames = os.listdir(results_path)
 mask_list = [i.split('_mask')[0] for i in mask_filenames]
+
+img_name_list = []
+with open(text_file, 'r') as f:
+    for line in f:
+        img_name_list.append(line.split('\n')[0])
 
 
 def imagenet_label_mappings():
@@ -47,7 +54,12 @@ class DataProcessing:
         self.data_path = data_path
         self.transform = transform
 
-        img_list = mask_list[img_idxs[0]:img_idxs[1]]
+        img_list = img_name_list[img_idxs[0]:img_idxs[1]]
+        #img_list = mask_list[img_idxs[0]:img_idxs[1]]
+
+        self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
+        # self.img_filenames.sort()
+
         self.img_filenames = [os.path.join(data_path, '{}.JPEG'.format(i)) for i in img_list]
         # print('img filenames=', self.img_filenames)
         self.mask_filenames = [os.path.join(results_path, '{}_mask.npy'.format(i)) for i in img_list]
@@ -101,9 +113,9 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-batch_size = 20
+batch_size = 2
 idx_start = 0
-idx_end = 20
+idx_end = 2
 # batch_size = 10
 mask_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[idx_start, idx_end])
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24,

@@ -50,20 +50,20 @@ def get_blurred_img(img, radius=10):
 if __name__ == '__main__':
 
 
-    img_path = 'perro_gato.jpg'
+    # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
-    #img_path = './dataset/0.JPEG'
+    img_path = './dataset/0.JPEG'
     save_path = './output/'
 
     #gt_category = 207  # Golden retriever
-    gt_category = 281  # tabby cat
+    # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
-    # gt_category = 1 # goldfish, Carassius auratus
+    gt_category = 1 # goldfish, Carassius auratus
     # gt_category = 732  # camara fotografica
 
     try:
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     perturb_binary = 0
     learning_rate = 0.1  # poca robustez *2 *3
     size = 224
-    noise = 0.1
+    noise = 0.0
 
     max_iterations = 300
     jitter = 4
@@ -179,8 +179,12 @@ if __name__ == '__main__':
         mask = numpy_to_torch(mask)
 
     # imagen nulla difuminada
-    orig_img_blur = original_img_pil.filter(ImageFilter.GaussianBlur(5))
+    orig_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(original_img_pil)
+    #null_img_blur = orig_img_blur
+
+    #orig_img_blur = original_img_pil.filter(ImageFilter.GaussianBlur(10))
     null_img_blur = transform(orig_img_blur).unsqueeze(0)
+
     null_img_blur.requires_grad = False
     null_img = null_img_blur.cuda()
 
