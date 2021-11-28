@@ -112,7 +112,7 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 init_time = time.time()
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10], if_noise=1)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10], if_noise=0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=10, shuffle=False, num_workers=24, pin_memory=True)
 
 # especificar cual gpu 0 o 1
@@ -131,9 +131,10 @@ for i, (images, target, path) in iterator:
     pred = torch.nn.Softmax(dim=1)(model(images))
     target = target.numpy()
 
-    #for i, file in enumerate(path):
-        # print('./dataset/{}.JPEG'.format(i))
+    for i, file in enumerate(path):
+        print('./dataset/{}.JPEG'.format(i))
         #shutil.copyfile(file, './dataset/{}'.format(file.split('/')[-1]))
+        shutil.copyfile(file, './dataset/{}.JPEG'.format(i))
 
     for j, img in enumerate(images):
         target_img = target[j].item()

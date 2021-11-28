@@ -31,8 +31,6 @@ sys.path.insert(0, './generativeimptorch')
 from utils.tools import get_config, get_model_list
 from model.networks import Generator
 
-val_dir = './val'
-
 imagenet_val_xml_path = './val_bb'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
@@ -283,18 +281,19 @@ def my_explanation(img_batch, max_iterations, gt_category):
     for eh in exp_hook:
         eh.remove()
 
-    mask_np = (mask.cpu().detach().numpy())
-
-    for i in range(mask_np.shape[0]):
-        plt.imshow(1 - mask_np[i, 0, :, :])
-        plt.show()
+    # Para visualizar las máscaras
+    # mask_np = (mask.cpu().detach().numpy())
+    #
+    # for i in range(mask_np.shape[0]):
+    #     plt.imshow(1 - mask_np[i, 0, :, :])
+    #     plt.show()
 
     return mask
 
-#batch_size = 50
+# batch_size = 45
 batch_size = 25
-#val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 500], if_noise=0)
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=1, noise_var=0.05)
+# val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 500], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
@@ -302,7 +301,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path='./output_v4_sintv_0.05'
+save_path='./output_v4'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False

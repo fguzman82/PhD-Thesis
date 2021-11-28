@@ -31,8 +31,6 @@ sys.path.insert(0, './generativeimptorch')
 from utils.tools import get_config, get_model_list
 from model.networks import Generator
 
-val_dir = './val'
-
 imagenet_val_xml_path = './val_bb'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
@@ -49,7 +47,8 @@ noise = 0.05
 
 tv_beta = 3
 tv_coeff = 1e-2
-factorTV = 0*0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+factorTV = 0 * 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+
 
 def inpainter(img, mask):
     config = get_config('./generativeimptorch/configs/config.yaml')
@@ -72,12 +71,13 @@ def inpainter(img, mask):
         last_model_name = get_model_list(checkpoint_path, "gen", iteration=0)
         netG.load_state_dict(torch.load(last_model_name))
 
-        #netG = torch.nn.parallel.DataParallel(netG, device_ids=[0, 1])
+        # netG = torch.nn.parallel.DataParallel(netG, device_ids=[0, 1])
         netG.cuda()
         # Inference
-        x1, x2, offset_flow = netG(x, (1.-mask))
+        x1, x2, offset_flow = netG(x, (1. - mask))
 
     return x2
+
 
 def tv_norm(input, tv_beta):
     img = input[:, 0, :]
@@ -85,12 +85,13 @@ def tv_norm(input, tv_beta):
     col_grad = torch.abs((img[:, :, :-1] - img[:, :, 1:])).pow(tv_beta).sum(dim=(1, 2))
     return row_grad + col_grad
 
+
 torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
 model.cuda()
 model.eval()
 
-print('GPU 0 explicacion ver 4')
+print('GPU 1 explicacion ver 4')
 
 img_name_list = []
 with open(text_file, 'r') as f:
@@ -133,7 +134,7 @@ class DataProcessing:
 
         img = self.transform(img)
         return img, target, os.path.join(self.data_path, self.img_filenames[index])
-        #return img, target
+        # return img, target
 
     def __len__(self):
         return len(self.img_filenames)
@@ -220,7 +221,6 @@ def get_activation_mask(name):
 
 
 def my_explanation(img_batch, max_iterations, gt_category):
-
     F_hook = []
     exp_hook = []
 
@@ -250,11 +250,10 @@ def my_explanation(img_batch, max_iterations, gt_category):
     mask = mask.cuda()
     mask.requires_grad = True
 
-    #null_img = torch.zeros(img_batch.size(0), 3, 224, 224).cuda()
-    #null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img_batch)
-    #null_img_blur.requires_grad = False
-    #null_img = null_img_blur.cuda()
-
+    # null_img = torch.zeros(img_batch.size(0), 3, 224, 224).cuda()
+    # null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img_batch)
+    # null_img_blur.requires_grad = False
+    # null_img = null_img_blur.cuda()
 
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
 
@@ -267,7 +266,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
                                              std=[0.229, 0.224, 0.225])(img_inpainted)
 
         perturbated_input = img_batch.mul(extended_mask) + img_inpainted.mul(1 - extended_mask)
-        #perturbated_input = perturbated_input.to(torch.float32)
+        # perturbated_input = perturbated_input.to(torch.float32)
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # (3,1000)
 
@@ -283,18 +282,20 @@ def my_explanation(img_batch, max_iterations, gt_category):
     for eh in exp_hook:
         eh.remove()
 
-    mask_np = (mask.cpu().detach().numpy())
-
-    for i in range(mask_np.shape[0]):
-        plt.imshow(1 - mask_np[i, 0, :, :])
-        plt.show()
+    # Para visualizar las máscaras
+    # mask_np = (mask.cpu().detach().numpy())
+    #
+    # for i in range(mask_np.shape[0]):
+    #     plt.imshow(1 - mask_np[i, 0, :, :])
+    #     plt.show()
 
     return mask
 
-#batch_size = 50
+
+# batch_size = 45
 batch_size = 25
-#val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 500], if_noise=0)
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=1, noise_var=0.1)
+# val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[501, 1001], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
@@ -302,7 +303,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path='./output_v4_sintv_0.1'
+save_path = './output_v4'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False

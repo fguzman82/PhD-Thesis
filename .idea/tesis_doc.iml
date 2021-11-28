@@ -7,8 +7,16 @@
       <excludeFolder url="file://$MODULE_DIR$/Imagenet" />
       <excludeFolder url="file://$MODULE_DIR$/val" />
       <excludeFolder url="file://$MODULE_DIR$/val_bb" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v2" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v3" />
+      <excludeFolder url="file://$MODULE_DIR$/dataset" />
+      <excludeFolder url="file://$MODULE_DIR$/LIME" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v4" />
+      <excludeFolder url="file://$MODULE_DIR$/imagenet" />
+      <excludeFolder url="file://$MODULE_DIR$/output_LIME" />
+      <excludeFolder url="file://$MODULE_DIR$/SP_single" />
     </content>
-    <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver1)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
