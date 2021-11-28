@@ -30,7 +30,7 @@ text_file = abs_path(input_dir_path)
 imagenet_class_mappings = './imagenet_class_mappings'
 
 torch.manual_seed(0)
-print('Explicacion SP - GPU 0')
+print('Explicacion SP - GPU 1')
 
 img_name_list = []
 with open(text_file, 'r') as f:
@@ -126,7 +126,7 @@ size = 224
 patch_size = 75
 stride = 3
 
-torch.cuda.set_device(0)  # especificar cual gpu 0 o 1
+torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
 model.eval()
 model.cuda()
@@ -162,7 +162,7 @@ init_time = time.time()
 
 save_path='./output_SP'
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 500], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[501, 1001], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
                                          pin_memory=True)
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
