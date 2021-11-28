@@ -15,6 +15,13 @@
       <excludeFolder url="file://$MODULE_DIR$/imagenet" />
       <excludeFolder url="file://$MODULE_DIR$/output_LIME" />
       <excludeFolder url="file://$MODULE_DIR$/SP_single" />
+      <excludeFolder url="file://$MODULE_DIR$/output_RISE" />
+      <excludeFolder url="file://$MODULE_DIR$/output_MP" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v4_0.1" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v4_0.05" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v4_tv" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v4_tv_0.1" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v4_tv_0.05" />
     </content>
     <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

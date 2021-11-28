@@ -47,7 +47,7 @@ noise = 0.05
 
 tv_beta = 3
 tv_coeff = 1e-2
-factorTV = 0* 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+factorTV = 1 * 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
 def inpainter(img, mask):
     config = get_config('./generativeimptorch/configs/config.yaml')
@@ -102,7 +102,6 @@ def imagenet_label_mappings():
         image_label_mapping = {int(x.split(":")[0]): x.split(":")[1].strip()
                                for x in f.readlines() if len(x.strip()) > 0}
         return image_label_mapping
-
 
 im_label_map = imagenet_label_mappings()
 
@@ -293,7 +292,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
 # batch_size = 45
 batch_size = 25
 # val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=0)
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 500], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 250], if_noise=1, noise_var=0.05)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
@@ -301,7 +300,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path='./output_v4'
+save_path='./output_v4_tv_0.05'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False
