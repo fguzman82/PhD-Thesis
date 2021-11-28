@@ -18,7 +18,8 @@ sys.path.insert(0, './RISE')
 from utilsrise import *
 from explanations import RISE
 
-print('Explicacion RISE GPU 0')
+print('Explicacion RISE GPU 1')
+
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
@@ -105,7 +106,7 @@ input_size = (224, 224)
 gpu_batch = 125 #Máxima cantidad para una GPU
 
 # Load black box model for explanations
-torch.cuda.set_device(0)   # especificar cual gpu 0 o 1
+torch.cuda.set_device(1)   # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
 model = nn.Sequential(model, nn.Softmax(dim=1))
 model = model.eval()
@@ -126,7 +127,7 @@ else:
     explainer.load_masks(maskspath)
     print('Masks are loaded.')
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 500], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[501, 1001], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
                                          pin_memory=True)
 print('      {: >5} images will be explained.'.format(len(val_loader) * val_loader.batch_size))
