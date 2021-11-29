@@ -127,7 +127,7 @@ else:
     explainer.load_masks(maskspath)
     print('Masks are loaded.')
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[501, 1001], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[251, 501], if_noise=1, noise_var=0.1)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
                                          pin_memory=True)
 print('      {: >5} images will be explained.'.format(len(val_loader) * val_loader.batch_size))
@@ -137,7 +137,7 @@ print('      {: >5} images will be explained.'.format(len(val_loader) * val_load
 #     p, c = torch.max(model(img.cuda()), dim=1)
 #     target[i] = c[0]
 
-save_path='./output_RISE'
+save_path='./output_RISE_0.1'
 
 # Get saliency maps for all images in val loader
 explanations = np.empty((len(val_loader), *input_size))

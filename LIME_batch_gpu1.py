@@ -162,10 +162,10 @@ def LIME_explanation(img, target):
 random.seed(0)
 init_time = time.time()
 
-val_dataset = DataProcessing(base_img_dir, pill_transf, img_idxs=[501, 1001], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, pill_transf, img_idxs=[251, 501], if_noise=1, noise_var=0.1)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
                                          pin_memory=True)
-save_path = './output_LIME'
+save_path = './output_LIME_0.1'
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
