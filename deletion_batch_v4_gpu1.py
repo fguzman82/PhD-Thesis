@@ -295,7 +295,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
 # batch_size = 45
 batch_size = 25
 # val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], if_noise=0)
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[251, 501], if_noise=1, noise_var=0.05)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[251, 501], if_noise=1, noise_var=0.1)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
@@ -303,7 +303,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path = './output_v4_tv_0.05'
+save_path = './output_v4_tv_0.1'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False

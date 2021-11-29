@@ -131,11 +131,11 @@ if __name__ == '__main__':
     max_iterations = 228 #130 *2
     l1_coeff = 0.01e-5*2  # *2 *4 *0.5 (robusto)
     size = 224
-    noise = 0.0
+    noise = 0.05
 
     tv_beta = 3
     tv_coeff = 1e-2
-    factorTV = 0.0 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+    factorTV = 1 * 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

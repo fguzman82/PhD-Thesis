@@ -25,8 +25,8 @@ from skimage.feature import hog
 from scipy.stats import spearmanr, pearsonr
 from skimage.metrics import structural_similarity as ssim
 
-results_path1 = './output_v4_sintv'
-results_path2 = './output_v4_sintv_0.1'
+results_path1 = './output_v3'
+results_path2 = './output_v3_0.1'
 
 mask_path1 = os.listdir(results_path1)
 mask_path2 = os.listdir(results_path2)
@@ -35,13 +35,21 @@ mask_list1 = [i.split('_mask')[0] for i in mask_path1]
 mask_list2 = [i.split('_mask')[0] for i in mask_path2]
 
 
+input_dir_path = 'images_list.txt'
+text_file = abs_path(input_dir_path)
+img_name_list = []
+with open(text_file, 'r') as f:
+    for line in f:
+        img_name_list.append(line.split('\n')[0])
+
 class DataProcessing:
     def __init__(self, img_idxs=[0, 1]):
 
-        mask_list_slice1 = mask_list1[img_idxs[0]:img_idxs[1]]
-        mask_list_slice2 = mask_list2[img_idxs[0]:img_idxs[1]]
-        self.mask_filenames1 = [os.path.join(results_path1, '{}_mask.npy'.format(i)) for i in mask_list_slice1]
-        self.mask_filenames2 = [os.path.join(results_path2, '{}_mask.npy'.format(i)) for i in mask_list_slice2]
+        #mask_list_slice1 = mask_list1[img_idxs[0]:img_idxs[1]]
+        #mask_list_slice2 = mask_list2[img_idxs[0]:img_idxs[1]]
+        img_list = img_name_list[img_idxs[0]:img_idxs[1]]
+        self.mask_filenames1 = [os.path.join(results_path1, '{}_mask.npy'.format(i)) for i in img_list]
+        self.mask_filenames2 = [os.path.join(results_path2, '{}_mask.npy'.format(i)) for i in img_list]
 
     def __getitem__(self, index):
         mask1 = np.load(self.mask_filenames1[index])
@@ -72,9 +80,9 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 
-batch_size = 50
+batch_size = 500
 idx_start = 0
-idx_end = 50
+idx_end = 500
 #batch_size = 10
 mask_dataset = DataProcessing(img_idxs=[idx_start, idx_end])
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24, pin_memory=True)

@@ -25,7 +25,7 @@ from tqdm import tqdm, trange
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './output_SP'
+results_path = './output_MP'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
@@ -121,9 +121,9 @@ mask_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[idx_start, 
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24,
                                           pin_memory=True)
 
-torch.cuda.set_device(0)
+torch.cuda.set_device(1)
 model = models.googlenet(pretrained=True)
-model = torch.nn.DataParallel(model, device_ids=[0, 1])
+#model = torch.nn.DataParallel(model, device_ids=[0, 1])
 model.cuda()
 model.eval()
 

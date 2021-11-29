@@ -45,12 +45,12 @@ def imagenet_label_mappings():
 
 
 class DataProcessing:
-    def __init__(self, data_path, transform, img_idxs=[0, 1], if_noise=0):
+    def __init__(self, data_path, transform, img_idxs=[0, 1], if_noise=0, noise_var=0):
         self.data_path = data_path
         self.transform = transform
         self.if_noise = if_noise
         self.noise_mean = 0
-        self.noise_var = 0.1
+        self.noise_var = noise_var
 
         img_list = img_name_list[img_idxs[0]:img_idxs[1]]
         self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
@@ -112,7 +112,7 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 init_time = time.time()
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10], if_noise=0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10], if_noise=1, noise_var=0.05)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=10, shuffle=False, num_workers=24, pin_memory=True)
 
 # especificar cual gpu 0 o 1

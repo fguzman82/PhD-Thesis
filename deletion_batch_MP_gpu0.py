@@ -92,11 +92,13 @@ class DataProcessing:
                                             )  # numpy, dtype=float64,range (0, 1)
             img = Image.fromarray(np.uint8(img * 255))
 
-        # img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img)
+
+        blurred_img = img.filter(ImageFilter.GaussianBlur(10))
+        #img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img)
         img = self.transform(img)
-        # img_blur = self.transform(img_blur)
-        # return img, img_blur, target, os.path.join(self.data_path, self.img_filenames[index])
-        return img, target, os.path.join(self.data_path, self.img_filenames[index])
+        img_blur = self.transform(blurred_img)
+        return img, img_blur, target, os.path.join(self.data_path, self.img_filenames[index])
+        # return img, target, os.path.join(self.data_path, self.img_filenames[index])
 
     def __len__(self):
         return len(self.img_filenames)
@@ -153,18 +155,18 @@ for param in model.parameters():
     param.requires_grad = False
 
 
-# def my_explanation(img_batch, img_batch_blur, max_iterations, gt_category):
-def my_explanation(img_batch, max_iterations, gt_category):
+def my_explanation(img_batch, img_batch_blur, max_iterations, gt_category):
+# def my_explanation(img_batch, max_iterations, gt_category):
     np.random.seed(seed=0)
     mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 28, 28)))
     mask = mask.expand(img_batch.size(0), 1, 28, 28)
     mask = mask.cuda()
     mask.requires_grad = True
 
-    null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img_batch)
+    # null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img_batch)
 
     # version para ruido
-    # null_img_blur = img_batch_blur
+    null_img_blur = img_batch_blur
     null_img_blur.requires_grad = False
     null_img = null_img_blur.cuda()
 
@@ -206,7 +208,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
 
 
 batch_size = 50
-# batch_size = 10
+# batch_size = 25
 val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 250], if_noise=1, noise_var=0.1)
 # val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10])
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=24,
@@ -218,27 +220,28 @@ iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
 save_path = './output_MP_0.1'
 
-for i, (images, target, file_names) in iterator:
-    images.requires_grad = False
-    images = images.cuda()
-    mask = my_explanation(images, max_iterations, target)
-    mask_np = (mask.cpu().detach().numpy())
-
-    for idx, file_name in enumerate(file_names):
-        mask_file = ('{}_mask.npy'.format(file_name.split('/')[-1].split('.JPEG')[0]))
-        mask_np_idx = resize(np.moveaxis(mask_np[idx, 0, :, :].transpose(), 0, 1), (size, size))
-        np.save(os.path.abspath(os.path.join(save_path, mask_file)), 1 - mask_np_idx)
-
-# version para ruido
-# for i, (images, images_blur, target, file_names) in iterator:
+# for i, (images, target, file_names) in iterator:
 #     images.requires_grad = False
 #     images = images.cuda()
-#     mask = my_explanation(images, images_blur, max_iterations, target)
+#     mask = my_explanation(images, max_iterations, target)
 #     mask_np = (mask.cpu().detach().numpy())
 #
 #     for idx, file_name in enumerate(file_names):
 #         mask_file = ('{}_mask.npy'.format(file_name.split('/')[-1].split('.JPEG')[0]))
 #         mask_np_idx = resize(np.moveaxis(mask_np[idx, 0, :, :].transpose(), 0, 1), (size, size))
 #         np.save(os.path.abspath(os.path.join(save_path, mask_file)), 1 - mask_np_idx)
+
+# version para ruido
+for i, (images, images_blur, target, file_names) in iterator:
+    images.requires_grad = False
+    images = images.cuda()
+    mask = my_explanation(images, images_blur, max_iterations, target)
+    mask_np = (mask.cpu().detach().numpy())
+
+
+    for idx, file_name in enumerate(file_names):
+        mask_file = ('{}_mask.npy'.format(file_name.split('/')[-1].split('.JPEG')[0]))
+        mask_np_idx = resize(np.moveaxis(mask_np[idx, 0, :, :].transpose(), 0, 1), (size, size))
+        np.save(os.path.abspath(os.path.join(save_path, mask_file)), 1 - mask_np_idx)
 
 print('Time taken: {:.3f}'.format(time.time() - init_time))

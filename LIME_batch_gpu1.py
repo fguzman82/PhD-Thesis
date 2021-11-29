@@ -28,7 +28,7 @@ torch.backends.cudnn.benchmark = False
 
 lime_background_pixel = 0
 lime_superpixel_num = 50
-lime_num_samples = 500
+lime_num_samples = 1000
 lime_superpixel_seed = 0
 lime_explainer_seed = 0
 batch_size = 100
@@ -143,7 +143,7 @@ def LIME_explanation(img, target):
 
     pytorch_lime_explanation = pytorch_explainer.explain_instance(lime_img, pytorch_batch_predict,
                                                                   batch_size=batch_size,
-                                                                  segmentation_fn=segmenter,
+                                                                  #segmentation_fn=segmenter,
                                                                   top_labels=None, labels=labels,
                                                                   hide_color=None,
                                                                   num_samples=lime_num_samples,
@@ -162,7 +162,7 @@ def LIME_explanation(img, target):
 random.seed(0)
 init_time = time.time()
 
-val_dataset = DataProcessing(base_img_dir, pill_transf, img_idxs=[251, 501], if_noise=1, noise_var=0.1)
+val_dataset = DataProcessing(base_img_dir, pill_transf, img_idxs=[250, 500], if_noise=1, noise_var=0.1)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
                                          pin_memory=True)
 save_path = './output_LIME_0.1'
