@@ -16,8 +16,6 @@ from tqdm import tqdm, trange
 import skimage
 from skimage.transform import resize
 
-use_cuda = torch.cuda.is_available()
-
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
@@ -37,12 +35,14 @@ with open(text_file, 'r') as f:
     for line in f:
         img_name_list.append(line.split('\n')[0])
 
+
 def imagenet_label_mappings():
     fileName = os.path.join(imagenet_class_mappings, 'imagenet_label_mapping')
     with open(fileName, 'r') as f:
         image_label_mapping = {int(x.split(":")[0]): x.split(":")[1].strip()
                                for x in f.readlines() if len(x.strip()) > 0}
         return image_label_mapping
+
 
 im_label_map = imagenet_label_mappings()
 
@@ -71,7 +71,7 @@ class DataProcessing:
 
         img = self.transform(img)
         return img, target, os.path.join(self.data_path, self.img_filenames[index])
-        #return img, target
+        # return img, target
 
     def __len__(self):
         return len(self.img_filenames)
@@ -97,6 +97,7 @@ transform_val = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225]),
 ])
+
 
 class OcclusionAnalysis:
     def __init__(self, image, net):
@@ -142,7 +143,8 @@ batch_size = int((224 - patch_size) / stride) + 1
 input_shape = (3, size, size)
 total_dim = np.prod(input_shape)
 index_matrix = np.arange(total_dim).reshape(input_shape)
-idx_patches = view_as_windows(index_matrix, (3, patch_size, patch_size), stride).reshape((-1,) + (3, patch_size, patch_size))
+idx_patches = view_as_windows(index_matrix, (3, patch_size, patch_size), stride).reshape(
+    (-1,) + (3, patch_size, patch_size))
 
 # Start perturbation loop
 batch_size = int((size - patch_size) / stride) + 1
@@ -160,7 +162,7 @@ del batch_mask
 
 init_time = time.time()
 
-save_path='./output_SP_0.1'
+save_path = './output_SP_0.1'
 
 val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 250], if_noise=1, noise_var=0.1)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
@@ -174,6 +176,5 @@ for i, (image, target, file_name) in iterator:
     heatmap = heatmap_occ.explain(neuron=target.item(), loader=trainloader)
     mask_file = ('{}_mask.npy'.format(file_name[0].split('/')[-1].split('.JPEG')[0]))
     np.save(os.path.abspath(os.path.join(save_path, mask_file)), heatmap)
-
 
 print('Time taken: {:.3f}'.format(time.time() - init_time))

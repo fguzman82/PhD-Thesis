@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-import warnings
 from torch.utils.data.sampler import Sampler
 from pycocotools.coco import COCO
 import argparse
@@ -22,12 +20,10 @@ import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+from skimage.util import view_as_windows
 import skimage
+from skimage.transform import resize
 
-from lime import lime_image
-from lime.wrappers.scikit_image import SegmentationAlgorithm
-
-warnings.simplefilter('ignore')
 
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
@@ -72,11 +68,10 @@ with open(text_file, 'r') as f:
 
 
 class CocoDetection:
-    def __init__(self, root, annFile, transform, transform2):
+    def __init__(self, root, annFile, transform):
         self.coco = COCO(annFile)
         self.root = root
         self.transform = transform
-        self.transform2 = transform2
         self.new_ids = img_name_list
 
     def __getitem__(self, index):
@@ -91,9 +86,8 @@ class CocoDetection:
             mask = transforms.CenterCrop(224)(mask)
             mask = transforms.ToTensor()(mask)
             mask = torch.nn.functional.normalize(mask, p=float('inf')).int()
-        if self.transform2 is not None:
-            image2 = self.transform2(image)
-        return np.array(image), mask, path, image2
+
+        return image, mask, path
 
     def __len__(self):
         return len(self.new_ids)
@@ -114,23 +108,17 @@ def tensor_imshow(inp, title=None, **kwargs):
 
 
 torch.manual_seed(0)
-lime_background_pixel = 0
-lime_superpixel_num = 50
-lime_num_samples = 1000
-lime_superpixel_seed = 0
-lime_explainer_seed = 0
-batch_size = 100
+
 
 torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
-model = nn.Sequential(model, nn.Softmax(dim=1))
-model.cuda()
-model.eval()
+model = model.eval()
+model = model.cuda()
 
 for param in model.parameters():
     param.requires_grad = False
 
-print('GPU 0 explicacion LIME - COCO')
+print('GPU 0 explicacion SP - COCO')
 
 transform_coco = transforms.Compose([
     transforms.Resize((256, 256)),
@@ -140,74 +128,62 @@ transform_coco = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
+class OcclusionAnalysis:
+    def __init__(self, image, net):
+        self.image = image
+        self.model = net
 
-def get_pytorch_preprocess_transform():
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    transf = transforms.Compose([
-        transforms.ToTensor(),
-        normalize
-    ])
-    return transf
+    def explain(self, neuron, loader):
+        # Compute original output
+        org_softmax = torch.nn.Softmax(dim=1)(self.model(self.image))
+        eval0 = org_softmax.data[0, neuron]
+        batch_heatmap = torch.Tensor().cuda()
 
+        for data in loader:
+            data = data.cuda()
+            softmax_out = torch.nn.Softmax(dim=1)(self.model(data * self.image))
+            delta = eval0 - softmax_out.data[:, neuron]
+            batch_heatmap = torch.cat((batch_heatmap, delta))
 
-def get_pil_transform():
-    transf = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.CenterCrop(224)
-    ])
-
-    return transf
-
-
-pytorch_explainer = lime_image.LimeImageExplainer(random_state=lime_explainer_seed)
-slic_parameters = {'n_segments': lime_superpixel_num, 'compactness': 30, 'sigma': 3}
-segmenter = SegmentationAlgorithm('slic', **slic_parameters)
-pill_transf = get_pil_transform()
-
-#########################################################
-# Function to compute probabilities
-# Pytorch
-pytorch_preprocess_transform = get_pytorch_preprocess_transform()
+        sqrt_shape = len(loader)
+        attribution = np.reshape(batch_heatmap.cpu().numpy(), (sqrt_shape, sqrt_shape))
+        attribution = np.clip(attribution, 0, 1)
+        attribution = resize(attribution, (size, size))
+        return attribution
 
 
-def pytorch_batch_predict(images):
-    batch = torch.stack(tuple(pytorch_preprocess_transform(i) for i in images), dim=0)
-    batch = batch.cuda()
-    probs = model(batch)
-    return probs.cpu().numpy()
+size = 224
+patch_size = 75
+stride = 3
 
+batch_size = int((224 - patch_size) / stride) + 1
 
-def LIME_explanation(img, target):
-    # This image will be passed to Lime Explainer
-    labels = (target,)
+# Create all occlusion masks initially to save time
+# Create mask
+input_shape = (3, size, size)
+total_dim = np.prod(input_shape)
+index_matrix = np.arange(total_dim).reshape(input_shape)
+idx_patches = view_as_windows(index_matrix, (3, patch_size, patch_size), stride).reshape(
+    (-1,) + (3, patch_size, patch_size))
 
-    # LIME analysis
-    lime_img = np.squeeze(img.numpy())
+# Start perturbation loop
+batch_size = int((size - patch_size) / stride) + 1
+batch_mask = torch.zeros(((idx_patches.shape[0],) + input_shape), device='cuda')
+total_dim = np.prod(input_shape)
+for i, p in enumerate(idx_patches):
+    mask = torch.ones(total_dim, device='cuda')
+    mask[p.reshape(-1)] = 0  # occ_val
+    batch_mask[i] = mask.reshape(input_shape)
 
-    pytorch_lime_explanation = pytorch_explainer.explain_instance(lime_img, pytorch_batch_predict,
-                                                                  batch_size=batch_size,
-                                                                  # segmentation_fn=segmenter,
-                                                                  top_labels=None, labels=labels,
-                                                                  hide_color=None,
-                                                                  num_samples=lime_num_samples,
-                                                                  random_seed=lime_superpixel_seed,
-                                                                  )
-    pytorch_segments = pytorch_lime_explanation.segments
-    pytorch_heatmap = np.zeros(pytorch_segments.shape)
-    local_exp = pytorch_lime_explanation.local_exp
-    exp = local_exp[target]
-
-    for i, (seg_idx, seg_val) in enumerate(exp):
-        pytorch_heatmap[pytorch_segments == seg_idx] = seg_val
-
-    return pytorch_heatmap
-
+trainloader = torch.utils.data.DataLoader(batch_mask.cpu(), batch_size=batch_size, shuffle=False,
+                                          num_workers=0)
+del mask
+del batch_mask
 
 COCO_ds = CocoDetection(root=im_path,
                         annFile=ann_path,
-                        transform=pill_transf,
-                        transform2=transform_coco)
+                        transform=transform_coco
+                        )
 
 data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=1, shuffle=False,
                                           num_workers=8, pin_memory=True,
@@ -216,23 +192,19 @@ data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=1, shuffle=False,
 
 print('longitud data loader:', len(data_loader))
 
-im_label_map = imagenet_label_mappings()
-thres_vals = np.arange(0.05, 1, 0.05)
-iou_table = np.zeros((len(data_loader) * data_loader.batch_size, 3))
+save_path = './output_SP_coco'
 
-save_path = './output_LIME_coco'
+iterator = enumerate(tqdm(data_loader, total=len(data_loader), desc='batch'))
 
-for i, (image, mask, paths, image_pred) in enumerate(data_loader):
-    print(i)
-    image_pred = image_pred.cuda()
-    pred = model(image_pred)
+for i, (image, mask, paths) in iterator:
+    image = image.cuda()
+    pred = model(image)
     pr, cl = torch.max(pred, 1)
     pred_target = cl.cpu()
     pr = pr.cpu().numpy()
-    exp_mask = LIME_explanation(image, pred_target.item())
+    heatmap_occ = OcclusionAnalysis(image, net=model)
+    heatmap = heatmap_occ.explain(neuron=pred_target.item(), loader=trainloader)
     gt_masks = mask.numpy()
-
-    for idx, path in enumerate(paths):
-        mask_file = ('{}.npy'.format(path.split('.jpg')[0]))
-        np.save(os.path.abspath(os.path.join(save_path, mask_file)), exp_mask)
+    mask_file = ('{}.npy'.format(paths[0].split('.jpg')[0]))
+    np.save(os.path.abspath(os.path.join(save_path, mask_file)), heatmap)
 

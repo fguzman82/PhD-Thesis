@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-import warnings
 from torch.utils.data.sampler import Sampler
 from pycocotools.coco import COCO
 import argparse
@@ -24,10 +22,10 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import skimage
 
-from lime import lime_image
-from lime.wrappers.scikit_image import SegmentationAlgorithm
-
-warnings.simplefilter('ignore')
+# bibliotecas RISE
+sys.path.insert(0, './RISE')
+from utilsrise import *
+from explanations import RISE
 
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
@@ -72,11 +70,10 @@ with open(text_file, 'r') as f:
 
 
 class CocoDetection:
-    def __init__(self, root, annFile, transform, transform2):
+    def __init__(self, root, annFile, transform):
         self.coco = COCO(annFile)
         self.root = root
         self.transform = transform
-        self.transform2 = transform2
         self.new_ids = img_name_list
 
     def __getitem__(self, index):
@@ -91,9 +88,8 @@ class CocoDetection:
             mask = transforms.CenterCrop(224)(mask)
             mask = transforms.ToTensor()(mask)
             mask = torch.nn.functional.normalize(mask, p=float('inf')).int()
-        if self.transform2 is not None:
-            image2 = self.transform2(image)
-        return np.array(image), mask, path, image2
+
+        return image, mask, path
 
     def __len__(self):
         return len(self.new_ids)
@@ -114,23 +110,22 @@ def tensor_imshow(inp, title=None, **kwargs):
 
 
 torch.manual_seed(0)
-lime_background_pixel = 0
-lime_superpixel_num = 50
-lime_num_samples = 1000
-lime_superpixel_seed = 0
-lime_explainer_seed = 0
-batch_size = 100
+# Size of imput images.
+input_size = (224, 224)
+# Size of batches for GPU.
+# Use maximum number that the GPU allows.
+gpu_batch = 125 #Máxima cantidad para una GPU
 
 torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
 model = nn.Sequential(model, nn.Softmax(dim=1))
-model.cuda()
-model.eval()
+model = model.eval()
+model = model.cuda()
 
 for param in model.parameters():
     param.requires_grad = False
 
-print('GPU 0 explicacion LIME - COCO')
+print('GPU 0 explicacion RISE - COCO')
 
 transform_coco = transforms.Compose([
     transforms.Resize((256, 256)),
@@ -140,74 +135,23 @@ transform_coco = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
+explainer = RISE(model, input_size, gpu_batch)
 
-def get_pytorch_preprocess_transform():
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    transf = transforms.Compose([
-        transforms.ToTensor(),
-        normalize
-    ])
-    return transf
+# Generate masks for RISE or use the saved ones.
+maskspath = 'masks.npy'
+generate_new = True
 
-
-def get_pil_transform():
-    transf = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.CenterCrop(224)
-    ])
-
-    return transf
-
-
-pytorch_explainer = lime_image.LimeImageExplainer(random_state=lime_explainer_seed)
-slic_parameters = {'n_segments': lime_superpixel_num, 'compactness': 30, 'sigma': 3}
-segmenter = SegmentationAlgorithm('slic', **slic_parameters)
-pill_transf = get_pil_transform()
-
-#########################################################
-# Function to compute probabilities
-# Pytorch
-pytorch_preprocess_transform = get_pytorch_preprocess_transform()
-
-
-def pytorch_batch_predict(images):
-    batch = torch.stack(tuple(pytorch_preprocess_transform(i) for i in images), dim=0)
-    batch = batch.cuda()
-    probs = model(batch)
-    return probs.cpu().numpy()
-
-
-def LIME_explanation(img, target):
-    # This image will be passed to Lime Explainer
-    labels = (target,)
-
-    # LIME analysis
-    lime_img = np.squeeze(img.numpy())
-
-    pytorch_lime_explanation = pytorch_explainer.explain_instance(lime_img, pytorch_batch_predict,
-                                                                  batch_size=batch_size,
-                                                                  # segmentation_fn=segmenter,
-                                                                  top_labels=None, labels=labels,
-                                                                  hide_color=None,
-                                                                  num_samples=lime_num_samples,
-                                                                  random_seed=lime_superpixel_seed,
-                                                                  )
-    pytorch_segments = pytorch_lime_explanation.segments
-    pytorch_heatmap = np.zeros(pytorch_segments.shape)
-    local_exp = pytorch_lime_explanation.local_exp
-    exp = local_exp[target]
-
-    for i, (seg_idx, seg_val) in enumerate(exp):
-        pytorch_heatmap[pytorch_segments == seg_idx] = seg_val
-
-    return pytorch_heatmap
+if generate_new or not os.path.isfile(maskspath):
+    explainer.generate_masks(N=6000, s=8, p1=0.1, savepath=maskspath)
+else:
+    explainer.load_masks(maskspath)
+    print('Masks are loaded.')
 
 
 COCO_ds = CocoDetection(root=im_path,
                         annFile=ann_path,
-                        transform=pill_transf,
-                        transform2=transform_coco)
+                        transform=transform_coco
+                        )
 
 data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=1, shuffle=False,
                                           num_workers=8, pin_memory=True,
@@ -220,19 +164,20 @@ im_label_map = imagenet_label_mappings()
 thres_vals = np.arange(0.05, 1, 0.05)
 iou_table = np.zeros((len(data_loader) * data_loader.batch_size, 3))
 
-save_path = './output_LIME_coco'
+save_path = './output_RISE_coco'
 
-for i, (image, mask, paths, image_pred) in enumerate(data_loader):
-    print(i)
-    image_pred = image_pred.cuda()
-    pred = model(image_pred)
+iterator = enumerate(tqdm(data_loader, total=len(data_loader)))
+explanations = np.empty((len(data_loader), *input_size))
+
+for i, (image, mask, paths) in iterator:
+    image = image.cuda()
+    pred = model(image)
     pr, cl = torch.max(pred, 1)
     pred_target = cl.cpu()
     pr = pr.cpu().numpy()
-    exp_mask = LIME_explanation(image, pred_target.item())
+    saliency_maps = explainer(image)
+    explanations[i] = saliency_maps[pred_target.item()].cpu().numpy()
     gt_masks = mask.numpy()
-
-    for idx, path in enumerate(paths):
-        mask_file = ('{}.npy'.format(path.split('.jpg')[0]))
-        np.save(os.path.abspath(os.path.join(save_path, mask_file)), exp_mask)
+    mask_file = ('{}.npy'.format(paths[0].split('.jpg')[0]))
+    np.save(os.path.abspath(os.path.join(save_path, mask_file)), explanations[i])
 
