@@ -308,7 +308,7 @@ COCO_ds = CocoDetection(root=im_path,
                         annFile=ann_path,
                         transform=transform_coco)
 
-data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=29, shuffle=False,
+data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=1, shuffle=False,
                                           num_workers=8, pin_memory=True,
                                           #sampler=RangeSampler(range(1, 5))
                                           )
@@ -318,6 +318,8 @@ print('longitud data loader:', len(data_loader))
 im_label_map = imagenet_label_mappings()
 thres_vals = np.arange(0.05, 1, 0.05)
 iou_table = np.zeros((len(data_loader)*data_loader.batch_size, 3))
+
+save_path = './output_v4_coco'
 
 for i, (images, masks, paths) in enumerate(data_loader):
     print(i)
@@ -330,24 +332,26 @@ for i, (images, masks, paths) in enumerate(data_loader):
     exp_mask = 1. - exp_mask.cpu().detach().numpy()
     gt_masks = masks.numpy()
 
-
     for idx, path in enumerate(paths):
-        iou = calculate_iou(gt_masks[idx, 0, :], exp_mask[idx, 0, :])
-        iou_arg = np.argmax(iou)
-        iou_table[i * data_loader.batch_size + idx, 0] = i * data_loader.batch_size + idx
-        iou_table[i*data_loader.batch_size+idx, 1] = iou[iou_arg]
-        iou_table[i*data_loader.batch_size+idx, 2] = iou_arg
-        print('path: ', path, ' iou = ', iou[iou_arg])
+        mask_file = ('{}.npy'.format(path.split('.jpg')[0]))
+        np.save(os.path.abspath(os.path.join(save_path, mask_file)), exp_mask[idx, 0, :])
+
+        # iou = calculate_iou(gt_masks[idx, 0, :], exp_mask[idx, 0, :])
+        # iou_arg = np.argmax(iou)
+        # iou_table[i * data_loader.batch_size + idx, 0] = i * data_loader.batch_size + idx
+        # iou_table[i*data_loader.batch_size+idx, 1] = iou[iou_arg]
+        # iou_table[i*data_loader.batch_size+idx, 2] = iou_arg
+        # print('path: ', path, ' iou = ', iou[iou_arg])
 
 
-        # title = 'p={:.1f} cat={}'.format(pr[idx], im_label_map.get(pred_target[idx]))
-        title = 'iou = {}'.format(iou[iou_arg])
-        tensor_imshow(images[idx].cpu(), title=title)
-        plt.axis('off')
-        exp_mask_th = exp_mask[idx, 0, :]
-        exp_mask_th = np.where(exp_mask_th > thres_vals[iou_arg], 1, 0)
-        plt.imshow(exp_mask_th, cmap='jet', alpha=0.5)
-        plt.show()
+        # # title = 'p={:.1f} cat={}'.format(pr[idx], im_label_map.get(pred_target[idx]))
+        # title = 'iou = {}'.format(iou[iou_arg])
+        # tensor_imshow(images[idx].cpu(), title=title)
+        # plt.axis('off')
+        # exp_mask_th = exp_mask[idx, 0, :]
+        # exp_mask_th = np.where(exp_mask_th > thres_vals[iou_arg], 1, 0)
+        # plt.imshow(exp_mask_th, cmap='jet', alpha=0.5)
+        # plt.show()
 
         # tensor_imshow(images[idx].cpu(), title='coco {}'.format(np.sum(gt_masks[idx, 0, :])))
         # plt.axis('off')

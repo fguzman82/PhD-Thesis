@@ -33,7 +33,7 @@ lime_superpixel_seed = 0
 lime_explainer_seed = 0
 batch_size = 100
 
-torch.cuda.set_device(0)  # especificar cual gpu 0 o 1
+torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
 model = nn.Sequential(model, nn.Softmax(dim=1))
 model.cuda()
@@ -170,8 +170,9 @@ save_path = './output_LIME_0.1'
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
 for i, (image, target, file_name) in iterator:
+    print(image.shape)
     mask = LIME_explanation(image, target.item())
-    mask_file = ('{}_mask.npy'.format(file_name[0].split('/')[-1].split('.JPEG')[0]))
-    np.save(os.path.abspath(os.path.join(save_path, mask_file)), mask)
+    #mask_file = ('{}_mask.npy'.format(file_name[0].split('/')[-1].split('.JPEG')[0]))
+    #np.save(os.path.abspath(os.path.join(save_path, mask_file)), mask)
 
 print('Time taken: {:.3f} secs'.format(time.time() - init_time))
