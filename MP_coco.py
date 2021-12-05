@@ -21,15 +21,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import skimage
+from skimage.transform import resize
 
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
-
-# bibliotecas inpainter
-sys.path.insert(0, './generativeimptorch')
-from utils.tools import get_config, get_model_list
-from model.networks import Generator
 
 dataset_dir = './coco'
 annotation_dir = './coco/annotations'
@@ -42,6 +38,16 @@ imagenet_class_mappings = './imagenet_class_mappings'
 input_dir_path = 'coco_validation.txt'
 text_file = abs_path(input_dir_path)
 
+torch.manual_seed(0)
+learning_rate = 0.1
+size = 224
+max_iterations = 300
+jitter = 4
+l1_coeff = 1e-4
+tv_beta = 3
+tv_coeff = 1e-2
+thresh = 0.5
+
 def imagenet_label_mappings():
     fileName = os.path.join(imagenet_class_mappings, 'imagenet_label_mapping')
     with open(fileName, 'r') as f:
@@ -52,7 +58,7 @@ def imagenet_label_mappings():
 
 transform_coco = transforms.Compose([
     transforms.Resize((256, 256)),
-    transforms.CenterCrop(224),
+    transforms.CenterCrop(224 + jitter),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225]),
@@ -115,52 +121,7 @@ def tensor_imshow(inp, title=None, **kwargs):
     # plt.show()
 
 
-torch.manual_seed(0)
-learning_rate = 0.1 * 0.8  # orig (0.3) 0.1 (preservation sparser) 0.3 (preservation dense)
-max_iterations = 228  # 130 *2
-l1_coeff = 0.01e-5 * 2  # *2 *4 *0.5 (robusto)
-size = 224
-
-tv_beta = 3
-tv_coeff = 1e-2
-factorTV = 5 * 0.5 * 0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
-
-
-def inpainter(img, mask):
-    config = get_config('./generativeimptorch/configs/config.yaml')
-    checkpoint_path = os.path.join('./generativeimptorch/checkpoints',
-                                   config['dataset_name'],
-                                   config['mask_type'] + '_' + config['expname'])
-    cuda = config['cuda']
-    device_ids = config['gpu_ids']
-
-    with torch.no_grad():  # enter no grad context
-        # Test a single masked image with a given mask
-        x = img
-        # denormaliza imagenet y se normaliza a inpainter [-1,1] mean=0.5, std=0.5
-        x = transforms.Normalize(mean=[0.015 / 0.229, 0.044 / 0.224, 0.094 / 0.225],
-                                 std=[0.5 / 0.229, 0.5 / 0.224, 0.5 / 0.225])(x)
-        x = x * (mask)
-        # Define the trainer
-        netG = Generator(config['netG'], cuda, device_ids)
-        # Resume weight
-        last_model_name = get_model_list(checkpoint_path, "gen", iteration=0)
-        netG.load_state_dict(torch.load(last_model_name))
-
-        # netG = torch.nn.parallel.DataParallel(netG, device_ids=[0, 1])
-        netG.cuda()
-        # Inference
-        x1, x2, offset_flow = netG(x, (1. - mask))
-
-    return x2
-
-
-def tv_norm(input, tv_beta):
-    img = input[:, 0, :]
-    row_grad = torch.abs((img[:, :-1, :] - img[:, 1:, :])).pow(tv_beta).sum(dim=(1, 2))
-    col_grad = torch.abs((img[:, :, :-1] - img[:, :, 1:])).pow(tv_beta).sum(dim=(1, 2))
-    return row_grad + col_grad
-
+upsample = torch.nn.UpsamplingNearest2d(size=(size, size)).to('cuda')
 
 torch.cuda.set_device(0)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
@@ -170,114 +131,58 @@ model.eval()
 for param in model.parameters():
     param.requires_grad = False
 
-print('GPU 0 explicacion ver 4 COCO')
-
-list_of_layers = ['conv1',
-                  'conv2',
-                  'conv3',
-                  'inception3a',
-                  'inception3b',
-                  'inception4a',
-                  'inception4b',
-                  'inception4c',
-                  'inception4d',
-                  'inception4e',
-                  'inception5a',
-                  'inception5b',
-                  'fc'
-                  ]
-activation_orig = {}
+print('GPU 0 explicacion MP COCO')
 
 
-def get_activation_orig(name):
-    def hook(model, input, output):
-        activation_orig[name] = output
-
-    return hook
-
-
-def get_activation_mask(name):
-    def hook(model, input, output):
-        act_mask = output
-        # print(act_mask.shape). #debug
-        # print(activation_orig[name].shape) #debug
-        limite_sup = (act_mask <= torch.fmax(torch.tensor(0), activation_orig[name]))
-        limite_inf = (act_mask >= torch.fmin(torch.tensor(0), activation_orig[name]))
-        oper = limite_sup * limite_inf
-        # print('oper shape=',oper.shape). #debug
-        act_mask.requires_grad_(True)
-        act_mask.retain_grad()
-        h = act_mask.register_hook(lambda grad: grad * oper)
-        # x.register_hook(update_gradients(2))
-        # activation[name]=act_mask
-        # h.remove()
-
-    return hook
+def tv_norm(input, tv_beta):
+    img = input[:, 0, :]
+    row_grad = torch.abs((img[:, :-1, :] - img[:, 1:, :])).pow(tv_beta).sum(dim=(1, 2))
+    col_grad = torch.abs((img[:, :, :-1] - img[:, :, 1:])).pow(tv_beta).sum(dim=(1, 2))
+    return row_grad + col_grad
 
 
 def my_explanation(img_batch, max_iterations, gt_category):
-    F_hook = []
-    exp_hook = []
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
-
-    # se calculan las activaciones para el batch de imágenes y se almacenan en la lista activation_orig
-    # la funcion "feed forward" registra los hook
-
-    org_softmax = torch.nn.Softmax(dim=1)(model(img_batch))
-
-    # se borran los hook registrados en Feed Forward
-    for fh in F_hook:
-        fh.remove()
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            exp_hook.append(layer.register_forward_hook(get_activation_mask(name)))
-
-    for param in model.parameters():
-        param.requires_grad = False
-
     np.random.seed(seed=0)
-    mask = torch.from_numpy(np.float32(np.random.uniform(0, 0.01, size=(1, 1, 224, 224))))
-    mask = mask.expand(img_batch.size(0), 1, 224, 224)
+    mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 28, 28)))
+    mask = mask.expand(img_batch.size(0), 1, 28, 28)
     mask = mask.cuda()
     mask.requires_grad = True
 
-    # null_img = torch.zeros(img_batch.size(0), 3, 224, 224).cuda()
-    # null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img_batch)
-    # null_img_blur.requires_grad = False
-    # null_img = null_img_blur.cuda()
+    null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(img_batch)
+
+    # version para ruido
+    # null_img_blur = img_batch_blur
+    null_img_blur.requires_grad = False
+    null_img = null_img_blur.cuda()
 
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
 
     for i in trange(max_iterations):
-        extended_mask = mask.expand(img_batch.size(0), 3, 224, 224)
 
-        img_inpainted = inpainter(img_batch, mask)
-        img_inpainted = transforms.Normalize(mean=-1, std=2)(img_inpainted)
-        img_inpainted = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                             std=[0.229, 0.224, 0.225])(img_inpainted)
+        if jitter != 0:
+            j1 = np.random.randint(jitter)
+            j2 = np.random.randint(jitter)
+        else:
+            j1 = 0
+            j2 = 0
 
-        perturbated_input = img_batch.mul(extended_mask) + img_inpainted.mul(1 - extended_mask)
-        # perturbated_input = perturbated_input.to(torch.float32)
+        upsampled_mask = upsample(mask)
+
+        extended_mask = upsampled_mask.expand(img_batch.size(0), 3, 224, 224)
+        perturbated_input = img_batch[:, :, j1:(size + j1), j2:(size + j2)].mul(extended_mask) + \
+                            null_img[:, :, j1:(size + j1), j2:(size + j2)].mul(1 - extended_mask)
+        perturbated_input = perturbated_input.to(torch.float32)
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # (3,1000)
 
         preds = outputs[torch.arange(0, img_batch.size(0)).tolist(), gt_category.tolist()]
 
-        loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds + \
-               factorTV * tv_coeff * tv_norm(mask, tv_beta)
-
+        loss = l1_coeff * torch.sum(torch.abs(1 - mask), dim=(1, 2, 3)) + preds + tv_coeff * tv_norm(mask, tv_beta)
         loss.backward(gradient=torch.ones_like(loss).cuda())
+        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         optimizer.step()
         mask.data.clamp_(0, 1)
 
-    for eh in exp_hook:
-        eh.remove()
-
-    # Para visualizar las máscaras
     # mask_np = (mask.cpu().detach().numpy())
     #
     # for i in range(mask_np.shape[0]):
@@ -308,7 +213,7 @@ COCO_ds = CocoDetection(root=im_path,
                         annFile=ann_path,
                         transform=transform_coco)
 
-data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=29, shuffle=False,
+data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=43, shuffle=False,
                                           num_workers=8, pin_memory=True,
                                           #sampler=RangeSampler(range(1, 5))
                                           )
@@ -317,7 +222,7 @@ print('longitud data loader:', len(data_loader))
 
 im_label_map = imagenet_label_mappings()
 thres_vals = np.arange(0.05, 1, 0.05)
-iou_table = np.zeros((len(data_loader)*data_loader.batch_size, 3))
+iou_table = np.empty((len(data_loader)*data_loader.batch_size, 3))
 
 for i, (images, masks, paths) in enumerate(data_loader):
     print(i)
@@ -332,7 +237,10 @@ for i, (images, masks, paths) in enumerate(data_loader):
 
 
     for idx, path in enumerate(paths):
-        iou = calculate_iou(gt_masks[idx, 0, :], exp_mask[idx, 0, :])
+        # print(paths[idx])
+        # print('max ', idx, '= ', exp_mask[idx].max())
+        mask_resize = resize(np.moveaxis(exp_mask[idx, 0, :, :].transpose(), 0, 1), (size, size))
+        iou = calculate_iou(gt_masks[idx, 0, :], mask_resize)
         iou_arg = np.argmax(iou)
         iou_table[i * data_loader.batch_size + idx, 0] = i * data_loader.batch_size + idx
         iou_table[i*data_loader.batch_size+idx, 1] = iou[iou_arg]
@@ -344,7 +252,7 @@ for i, (images, masks, paths) in enumerate(data_loader):
         title = 'iou = {}'.format(iou[iou_arg])
         tensor_imshow(images[idx].cpu(), title=title)
         plt.axis('off')
-        exp_mask_th = exp_mask[idx, 0, :]
+        exp_mask_th = mask_resize
         exp_mask_th = np.where(exp_mask_th > thres_vals[iou_arg], 1, 0)
         plt.imshow(exp_mask_th, cmap='jet', alpha=0.5)
         plt.show()
@@ -367,8 +275,8 @@ for i, (images, masks, paths) in enumerate(data_loader):
         # plt.imshow(mask_union, cmap='jet', alpha=0.5)
         # plt.show()
 
-# print(iou_table)
-# print(iou_table.mean(axis=0))
+print(iou_table)
+print(iou_table.mean(axis=0))
 
 
 
