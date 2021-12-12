@@ -36,8 +36,36 @@
       <excludeFolder url="file://$MODULE_DIR$/output_v3_0.1" />
       <excludeFolder url="file://$MODULE_DIR$/output_v3_0.05" />
       <excludeFolder url="file://$MODULE_DIR$/coco" />
+      <excludeFolder url="file://$MODULE_DIR$/output_LIME_coco" />
+      <excludeFolder url="file://$MODULE_DIR$/output_LIME_v2" />
+      <excludeFolder url="file://$MODULE_DIR$/output_MP_coco" />
+      <excludeFolder url="file://$MODULE_DIR$/output_RISE_coco" />
+      <excludeFolder url="file://$MODULE_DIR$/output_SP_coco" />
+      <excludeFolder url="file://$MODULE_DIR$/output_v4_coco" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_LIME" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_MP" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_MP_0.1" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_MP_0.05" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_RISE" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_SP" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_LIME" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_MP" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_MP_0.1" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_MP_0.05" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_RISE" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_SP" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_v2" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_v2_test" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_v2_test2" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_LIME" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_MP" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_MP_0.1" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_MP_0.05" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_RISE" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_SP" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_v2" />
     </content>
-    <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver3)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver4)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">

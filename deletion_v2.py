@@ -98,7 +98,7 @@ if __name__ == '__main__':
                       'inception4e',
                       'inception5a',
                       'inception5b',
-                      'fc'
+                      #'fc'
                       ]
 
     label_map = load_imagenet_label_map()

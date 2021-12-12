@@ -33,8 +33,11 @@ lime_superpixel_seed = 0
 lime_explainer_seed = 0
 batch_size = 100
 
-torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
-model = models.googlenet(pretrained=True)
+torch.cuda.set_device(0)  # especificar cual gpu 0 o 1
+# model = models.googlenet(pretrained=True)
+# model = models.resnet50(pretrained=True)
+# model = models.vgg16(pretrained=True)
+model = models.alexnet(pretrained=True)
 model = nn.Sequential(model, nn.Softmax(dim=1))
 model.cuda()
 model.eval()
@@ -162,17 +165,18 @@ def LIME_explanation(img, target):
 random.seed(0)
 init_time = time.time()
 
-val_dataset = DataProcessing(base_img_dir, pill_transf, img_idxs=[0, 250], if_noise=1, noise_var=0.1)
+val_dataset = DataProcessing(base_img_dir, pill_transf, img_idxs=[0, 100], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
                                          pin_memory=True)
-save_path = './output_LIME_0.1'
+# save_path = './resnet50_LIME'
+# save_path = './vgg16_LIME'
+save_path = './alexnet_LIME'
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
 for i, (image, target, file_name) in iterator:
-    print(image.shape)
     mask = LIME_explanation(image, target.item())
-    #mask_file = ('{}_mask.npy'.format(file_name[0].split('/')[-1].split('.JPEG')[0]))
-    #np.save(os.path.abspath(os.path.join(save_path, mask_file)), mask)
+    mask_file = ('{}_mask.npy'.format(file_name[0].split('/')[-1].split('.JPEG')[0]))
+    np.save(os.path.abspath(os.path.join(save_path, mask_file)), mask)
 
 print('Time taken: {:.3f} secs'.format(time.time() - init_time))

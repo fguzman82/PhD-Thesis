@@ -157,9 +157,11 @@ im_label_map = imagenet_label_mappings()
 thres_vals = np.arange(0.05, 1, 0.05)
 iou_table = np.zeros((len(data_loader)*data_loader.batch_size, 3))
 
-load_path = './output_SP_coco'
+load_path = './output_v4_coco'
 
 iterator = enumerate(tqdm(data_loader, total=len(data_loader), desc='batch'))
+
+fig = plt.figure(figsize=(3.54,3.54), dpi=600)
 
 for i, (image, mask, path) in iterator:
     image = image.cuda()
@@ -184,7 +186,7 @@ for i, (image, mask, path) in iterator:
     tensor_imshow(image[0].cpu(), title=title)
     plt.axis('off')
     exp_mask_th = np.where(exp_mask > thres_vals[iou_arg], 1, 0)
-    plt.imshow(exp_mask_th, cmap='jet', alpha=0.5)
+    plt.imshow(exp_mask_th, cmap='jet', alpha=0.4)
     plt.show()
 
         # tensor_imshow(images[idx].cpu(), title='coco {}'.format(np.sum(gt_mask[idx, 0, :])))

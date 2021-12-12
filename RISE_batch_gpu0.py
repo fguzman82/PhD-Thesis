@@ -102,11 +102,15 @@ transform_val = transforms.Compose([
 input_size = (224, 224)
 # Size of batches for GPU.
 # Use maximum number that the GPU allows.
-gpu_batch = 125 #Máxima cantidad para una GPU
+gpu_batch = 200 # 125 #Máxima cantidad para una GPU (200 para alexnet)
+# gpu_batch = 20 #Máxima cantidad para una GPU para VGG16
 
 # Load black box model for explanations
 torch.cuda.set_device(0)   # especificar cual gpu 0 o 1
-model = models.googlenet(pretrained=True)
+# model = models.googlenet(pretrained=True)
+# model = models.resnet50(pretrained=True)
+# model = models.vgg16(pretrained=True)
+model = models.alexnet(pretrained=True)
 model = nn.Sequential(model, nn.Softmax(dim=1))
 model = model.eval()
 model = model.cuda()
@@ -126,7 +130,7 @@ else:
     explainer.load_masks(maskspath)
     print('Masks are loaded.')
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 250], if_noise=1, noise_var=0.1)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 100], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=10,
                                          pin_memory=True)
 print('      {: >5} images will be explained.'.format(len(val_loader) * val_loader.batch_size))
@@ -136,7 +140,9 @@ print('      {: >5} images will be explained.'.format(len(val_loader) * val_load
 #     p, c = torch.max(model(img.cuda()), dim=1)
 #     target[i] = c[0]
 
-save_path='./output_RISE_0.1'
+# save_path = './resnet50_RISE'
+# save_path = './vgg16_RISE'
+save_path = './alexnet_RISE'
 
 # Get saliency maps for all images in val loader
 explanations = np.empty((len(val_loader), *input_size))

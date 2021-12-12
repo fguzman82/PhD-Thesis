@@ -46,8 +46,10 @@ tv_coeff = 1e-2
 thresh = 0.5
 
 torch.cuda.set_device(0)  # especificar cual gpu 0 o 1
-model = models.googlenet(pretrained=True)
-# model = torch.nn.DataParallel(model, device_ids=[0,1])
+# model = models.googlenet(pretrained=True)
+# model = models.resnet50(pretrained=True)
+# model = models.vgg16(pretrained=True)
+model = models.alexnet(pretrained=True)
 model.cuda()
 model.eval()
 
@@ -209,7 +211,7 @@ def my_explanation(img_batch, img_batch_blur, max_iterations, gt_category):
 
 batch_size = 50
 # batch_size = 25
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 250], if_noise=1, noise_var=0.1)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 100], if_noise=1, noise_var=0.1)
 # val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10])
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=24,
                                          pin_memory=True)
@@ -218,7 +220,7 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path = './output_MP_0.1'
+save_path = './alexnet_MP_0.1'
 
 # for i, (images, target, file_names) in iterator:
 #     images.requires_grad = False
