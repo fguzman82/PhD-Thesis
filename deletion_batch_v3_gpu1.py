@@ -42,10 +42,9 @@ size = 224
 
 torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 # model = models.googlenet(pretrained=True)
-model = models.resnet50(pretrained=True)
+# model = models.resnet50(pretrained=True)
 # model = models.vgg16(pretrained=True)
-# model = models.alexnet(pretrained=True)
-#model = torch.nn.DataParallel(model, device_ids=[0,1])
+model = models.alexnet(pretrained=True)
 model.cuda()
 model.eval()
 
@@ -135,20 +134,67 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 
-list_of_layers = ['conv1',
-                  'conv2',
-                  'conv3',
-                  'inception3a',
-                  'inception3b',
-                  'inception4a',
-                  'inception4b',
-                  'inception4c',
-                  'inception4d',
-                  'inception4e',
-                  'inception5a',
-                  'inception5b',
-                  'fc'
+# list_of_layers = ['conv1',
+#                   'conv2',
+#                   'conv3',
+#                   'inception3a',
+#                   'inception3b',
+#                   'inception4a',
+#                   'inception4b',
+#                   'inception4c',
+#                   'inception4d',
+#                   'inception4e',
+#                   'inception5a',
+#                   'inception5b',
+#                   'fc'
+#                   ]
+
+# capas para resnet50
+# list_of_layers = ['relu',
+#                   'layer1.0',
+#                   'layer1.1',
+#                   'layer1.2',
+#                   'layer2.0',
+#                   'layer2.1',
+#                   'layer2.2',
+#                   'layer2.3',
+#                   'layer3.0',
+#                   'layer3.1',
+#                   'layer3.2',
+#                   'layer3.3',
+#                   'layer3.4',
+#                   'layer3.5',
+#                   'layer4.0',
+#                   'layer4.1',
+#                   'layer4.2',
+#                   ]
+
+# capas para vgg16
+# list_of_layers = ['features.1',
+#                   'features.3',
+#                   'features.6',
+#                   'features.8',
+#                   'features.11',
+#                   'features.13',
+#                   'features.15',
+#                   'features.18',
+#                   'features.20',
+#                   'features.22',
+#                   'features.25',
+#                   'features.27',
+#                   'features.29'
+#                   ]
+
+# capas para alexnet
+list_of_layers = ['features.1',
+                  'features.4',
+                  'features.7',
+                  'features.9',
+                  'features.11',
+                  'classifier.2',
+                  'classifier.5'
                   ]
+
 activation_orig = {}
 
 
@@ -183,9 +229,13 @@ def my_explanation(img_batch, max_iterations, gt_category):
     F_hook = []
     exp_hook = []
 
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
+    for module_name, module in model.named_modules():
+        if module_name in list_of_layers:
+            F_hook.append(module.register_forward_hook(get_activation_orig(module_name)))
+
+    # for name, layer in model.named_children():
+    #     if name in list_of_layers:
+    #         F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
 
     # se calculan las activaciones para el batch de imágenes y se almacenan en la lista activation_orig
     # la funcion "feed forward" registra los hook
@@ -196,12 +246,16 @@ def my_explanation(img_batch, max_iterations, gt_category):
     for fh in F_hook:
         fh.remove()
 
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            exp_hook.append(layer.register_forward_hook(get_activation_mask(name)))
+    for module_name, module in model.named_modules():
+        if module_name in list_of_layers:
+            exp_hook.append(module.register_forward_hook(get_activation_mask(module_name)))
+
+    # for name, layer in model.named_children():
+    #     if name in list_of_layers:
+    #         exp_hook.append(layer.register_forward_hook(get_activation_mask(name)))
 
     for param in model.parameters():
-        param.requires_grad = True
+        param.requires_grad = False
 
     np.random.seed(seed=0)
     mask = torch.from_numpy(np.random.uniform(0, 0.01, size=(1, 1, 224, 224)))
@@ -242,7 +296,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
 
     return mask
 
-batch_size = 50
+batch_size = 30
 # batch_size = 10
 val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[100, 200], if_noise=0, noise_var=0.0)
 # val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10])
@@ -253,9 +307,9 @@ init_time = time.time()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path = './resnet50_v3'
+# save_path = './resnet50_v3'
 # save_path = './vgg16_v3'
-# save_path = './alexnet_v3'
+save_path = './alexnet_v3'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False

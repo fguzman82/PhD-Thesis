@@ -25,7 +25,7 @@ from tqdm import tqdm, trange
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './resnet50_LIME'
+results_path = './alexnet_LIME'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
@@ -98,18 +98,18 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-batch_size = 100  #200  #50
+batch_size = 200  #200  #50
 idx_start = 0
-idx_end = 100  #1000   #50
+idx_end = 200  #1000   #50
 #batch_size = 10
 mask_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[idx_start, idx_end])
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24, pin_memory=True)
 
 torch.cuda.set_device(0)
 # model = models.googlenet(pretrained=True)
-model = models.resnet50(pretrained=True)
+# model = models.resnet50(pretrained=True)
 # model = models.vgg16(pretrained=True)
-# model = models.alexnet(pretrained=True)
+model = models.alexnet(pretrained=True)
 model = torch.nn.DataParallel(model, device_ids=[0,1])
 model.cuda()
 model.eval()

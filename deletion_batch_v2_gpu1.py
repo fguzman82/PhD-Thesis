@@ -43,9 +43,8 @@ size = 224
 torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
 # model = models.googlenet(pretrained=True)
 # model = models.resnet50(pretrained=True)
-model = models.vgg16(pretrained=True)
-# model = models.alexnet(pretrained=True)
-
+# model = models.vgg16(pretrained=True)
+model = models.alexnet(pretrained=True)
 model.cuda()
 model.eval()
 
@@ -303,8 +302,8 @@ init_time = time.time()
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
 # save_path = './resnet50_v2'
-save_path = './vgg16_v2'
-# save_path = './alexnet_v2'
+# save_path = './vgg16_v2'
+save_path = './alexnet_v2'
 
 for i, (images, target, file_names) in iterator:
     images.requires_grad = False

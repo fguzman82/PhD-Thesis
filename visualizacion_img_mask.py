@@ -25,7 +25,7 @@ from tqdm import tqdm, trange
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './vgg16_v2'
+results_path = './resnet50_v3'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
