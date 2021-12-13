@@ -20,6 +20,7 @@ import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+import pandas as pd
 
 # bibliotecas RISE
 sys.path.insert(0, './RISE')
@@ -121,7 +122,7 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-batch_size = 2
+batch_size = 1
 idx_start = 0 #22
 idx_end = 20 #22+5
 # batch_size = 10
@@ -144,17 +145,68 @@ for p in model.parameters():
 im_label_map = imagenet_label_mappings()
 iterator = tqdm(enumerate(mask_loader), total=len(mask_loader), desc='batch')
 
+df = pd.read_pickle('auc_scores.pkl')
+cols_list = ['googlenet_SP', 'googlenet_LIME', 'googlenet_v4', 'googlenet_MP', 'googlenet_RISE']
+
+
+def plot_masks(nrows, ncols, mask_arr, orig_img, file_name, titles):
+    # fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(7.5, 3))
+    filename = file_name.split('/')[-1].split('.JPEG')[0]
+    df2 = df[df.file == filename]
+    print(df2)
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
+    fig.subplots_adjust(left=0, bottom=0, right=1, top=0.95, wspace=0.03, hspace=0.12)
+    axes = np.reshape(axes, (nrows, ncols))
+    index = 0
+    for row in range(nrows):
+        for col in range(ncols):
+            ax = axes[row][col]
+            if row == 0 and col == 0:  # imagen original
+                inp = orig_img.numpy().transpose((1, 2, 0))
+                # Mean and std for ImageNet
+                mean = np.array([0.485, 0.456, 0.406])
+                std = np.array([0.229, 0.224, 0.225])
+                inp = std * inp + mean
+                inp = np.clip(inp, 0, 1)
+                im = ax.imshow(inp, interpolation='none')
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['left'].set_visible(False)
+                ax.set_title('Orig Image')
+                ax.set_xticks([])
+                ax.set_yticks([])
+            else:
+                im = ax.imshow(mask_arr[index], interpolation='none')
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['left'].set_visible(False)
+                ax.set_title(titles[index])
+                ax.text(160, 205, np.round(df2[cols_list[index]].item(), 3), color='black', bbox=dict(facecolor='white', alpha=1))
+                ax.set_xticks([])
+                ax.set_yticks([])
+                index=index+1
+    plt.show()
+
+titles = ['SP', 'LIME', 'MIC (ours)', 'MP', 'RISE']
 
 for i, (images, mask_SP, mask_LIME, mask_RISE, mask_MP, mask_v4, target, file_name) in iterator:
     pred = torch.nn.Softmax(dim=1)(model(images.cuda()))
+    mask_arr = []
     for j, img in enumerate(images):
+        mask_arr.append(mask_SP[j].numpy())
+        mask_arr.append(mask_LIME[j].numpy())
+        mask_arr.append(mask_v4[j].numpy())
+        mask_arr.append(mask_MP[j].numpy())
+        mask_arr.append(mask_RISE[j].numpy())
         target_img = target[j].item()
         pr, cl = torch.topk(pred[j], 1)
         pr = pr.cpu().detach().numpy()[0]
         cl = cl.cpu().detach().numpy()[0]
-        title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
-        # title = 'target={}'.format(im_label_map.get(target_img))
-        tensor_imshow(img, title=title)
-        mask_np = mask_LIME[j].numpy()
-        plt.imshow(mask_np)
-        plt.show()
+        #title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
+        #tensor_imshow(img, title=title)
+        # mask_np = mask_LIME[j].numpy()
+        # plt.imshow(mask_np)
+        # plt.show()
+        plot_masks(2, 3, mask_arr, img, file_name[j], titles)
