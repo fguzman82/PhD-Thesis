@@ -31,7 +31,7 @@ def gkern(klen, nsig):
 
 def auc(arr):
     """Returns normalized Area Under Curve of the array."""
-    return (arr.sum() - arr[0] / 2 - arr[-1] / 2) / (arr.shape[0] - 1)
+    return (arr.sum(0) - arr[0] / 2 - arr[-1] / 2) / (arr.shape[0] - 1)
 
 class CausalMetric():
 

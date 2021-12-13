@@ -21,24 +21,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 
-import plotly.express as px
-import plotly.graph_objects as go
-import plotly.offline as py
-from plotly.subplots import make_subplots
-
 # bibliotecas RISE
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './resnet50_v4'
+results_path_SP = './output_SP'
+results_path_LIME = './output_LIME'
+results_path_RISE = './output_RISE'
+results_path_MP = './output_MP'
+results_path_v4 = './output_v4'
+
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
 input_dir_path = 'images_list.txt'
 text_file = abs_path(input_dir_path)
 
-mask_filenames = os.listdir(results_path)
-mask_list = [i.split('_mask')[0] for i in mask_filenames]
+img_subset = [0, 2, 3, 5, 7, 14, 20, 24, 25, 33, 35, 32, 39, 47, 48, 49, 56, 59, 60, 77, 80, 111, 120, 121, 125,
+              126, 127, 128, 132, 155, 165, 166]
 
 img_name_list = []
 with open(text_file, 'r') as f:
@@ -59,24 +59,27 @@ class DataProcessing:
         self.data_path = data_path
         self.transform = transform
 
-        img_list = img_name_list[img_idxs[0]:img_idxs[1]]
-        # img_list = mask_list[img_idxs[0]:img_idxs[1]]
-
-        self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
-        # self.img_filenames.sort()
+        img_list = [img_name_list[i] for i in img_subset[img_idxs[0]:img_idxs[1]]]
+        # img_list = img_name_list[img_idxs[0]:img_idxs[1]]
 
         self.img_filenames = [os.path.join(data_path, '{}.JPEG'.format(i)) for i in img_list]
-        # print('img filenames=', self.img_filenames)
-        self.mask_filenames = [os.path.join(results_path, '{}_mask.npy'.format(i)) for i in img_list]
-        # print('mask filenames=', self.mask_filenames)
+        self.mask_filenames_SP = [os.path.join(results_path_SP, '{}_mask.npy'.format(i)) for i in img_list]
+        self.mask_filenames_LIME = [os.path.join(results_path_LIME, '{}_mask.npy'.format(i)) for i in img_list]
+        self.mask_filenames_RISE = [os.path.join(results_path_RISE, '{}_mask.npy'.format(i)) for i in img_list]
+        self.mask_filenames_MP = [os.path.join(results_path_MP, '{}_mask.npy'.format(i)) for i in img_list]
+        self.mask_filenames_v4 = [os.path.join(results_path_v4, '{}_mask.npy'.format(i)) for i in img_list]
 
     def __getitem__(self, index):
         img = Image.open(os.path.join(self.data_path, self.img_filenames[index])).convert('RGB')
         target = self.get_image_class(os.path.join(self.data_path, self.img_filenames[index]))
-        mask = np.load(self.mask_filenames[index])
+        mask_SP = np.load(self.mask_filenames_SP[index])
+        mask_LIME = np.load(self.mask_filenames_LIME[index])
+        mask_RISE = np.load(self.mask_filenames_RISE[index])
+        mask_MP = np.load(self.mask_filenames_MP[index])
+        mask_v4 = np.load(self.mask_filenames_v4[index])
+
         img = self.transform(img)
-        return img, mask, target
-        # , os.path.join(self.data_path, self.img_filenames[index])
+        return img, mask_SP, mask_LIME, mask_RISE, mask_MP, mask_v4, target, os.path.join(self.data_path, self.img_filenames[index])
 
     def __len__(self):
         return len(self.img_filenames)
@@ -118,17 +121,20 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-batch_size = 1
-idx_start = 6*7*3
-idx_end = 6*7*4
+batch_size = 2
+idx_start = 0 #22
+idx_end = 20 #22+5
 # batch_size = 10
 mask_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[idx_start, idx_end])
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24,
                                           pin_memory=True)
 
-torch.cuda.set_device(1)
-model = models.googlenet(pretrained=True)
-# model = torch.nn.DataParallel(model, device_ids=[0, 1])
+torch.cuda.set_device(0)
+# model = models.googlenet(pretrained=True)
+model = models.resnet50(pretrained=True)
+# model = models.vgg16(pretrained=True)
+# model = models.alexnet(pretrained=True)
+#model = torch.nn.DataParallel(model, device_ids=[0, 1])
 model.cuda()
 model.eval()
 
@@ -138,32 +144,17 @@ for p in model.parameters():
 im_label_map = imagenet_label_mappings()
 iterator = tqdm(enumerate(mask_loader), total=len(mask_loader), desc='batch')
 
-fig = make_subplots(6, 14)
 
-for i, (img, mask, target) in iterator:
-    target = target.item()
-
-    # tensor_imshow(img[0])
-    mask_np = mask[0].numpy()
-    # plt.imshow(mask_np)
-    # plt.show()
-
-    inp = img[0].numpy().transpose((1, 2, 0))
-    # Mean and std for ImageNet
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
-    inp = std * inp + mean
-    inp = np.clip(inp, 0, 1)
-    img8 = (np.uint8(inp * 255))
-    fig.add_trace(go.Image(z=img8), (i % 6) + 1, (i // 6) * 2 + 1)
-    fig.add_trace(go.Heatmap(z=mask_np, colorscale='Viridis'), (i % 6) + 1, (i // 6) * 2 + 2)
-
-fig.update_yaxes(autorange='reversed')
-fig.update_layout(showlegend=False)
-fig.update_xaxes(visible=False)
-fig.update_yaxes(visible=False)
-html_str = py.plot(fig, output_type='div')
-
-f = open('prueba.html', 'w')
-f.write(html_str)
-f.close()
+for i, (images, mask_SP, mask_LIME, mask_RISE, mask_MP, mask_v4, target, file_name) in iterator:
+    pred = torch.nn.Softmax(dim=1)(model(images.cuda()))
+    for j, img in enumerate(images):
+        target_img = target[j].item()
+        pr, cl = torch.topk(pred[j], 1)
+        pr = pr.cpu().detach().numpy()[0]
+        cl = cl.cpu().detach().numpy()[0]
+        title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
+        # title = 'target={}'.format(im_label_map.get(target_img))
+        tensor_imshow(img, title=title)
+        mask_np = mask_LIME[j].numpy()
+        plt.imshow(mask_np)
+        plt.show()

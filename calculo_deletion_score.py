@@ -20,19 +20,27 @@ import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+import pandas as pd
 
 #bibliotecas RISE
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './alexnet_LIME'
+results_path = './alexnet_v4_tv'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
 
+input_dir_path = 'images_list.txt'
+text_file = abs_path(input_dir_path)
+
 mask_filenames = os.listdir(results_path)
 mask_list = [i.split('_mask')[0] for i in mask_filenames]
 
+img_name_list = []
+with open(text_file, 'r') as f:
+    for line in f:
+        img_name_list.append(line.split('\n')[0])
 
 def imagenet_label_mappings():
     fileName = os.path.join(imagenet_class_mappings, 'imagenet_label_mapping')
@@ -46,7 +54,8 @@ class DataProcessing:
         self.data_path = data_path
         self.transform = transform
 
-        img_list = mask_list[img_idxs[0]:img_idxs[1]]
+        img_list = img_name_list[img_idxs[0]:img_idxs[1]]
+        # img_list = mask_list[img_idxs[0]:img_idxs[1]]
         self.img_filenames = [os.path.join(data_path, '{}.JPEG'.format(i)) for i in img_list]
         #print('img filenames=', self.img_filenames)
         self.mask_filenames = [os.path.join(results_path, '{}_mask.npy'.format(i)) for i in img_list]
@@ -57,8 +66,7 @@ class DataProcessing:
         target = self.get_image_class(os.path.join(self.data_path, self.img_filenames[index]))
         mask = np.load(self.mask_filenames[index])
         img = self.transform(img)
-        return img, mask, target
-        # , os.path.join(self.data_path, self.img_filenames[index])
+        return img, mask, target, os.path.join(self.data_path, self.img_filenames[index])
 
     def __len__(self):
         return len(self.img_filenames)
@@ -132,11 +140,30 @@ iterator = tqdm(enumerate(mask_loader), total=len(mask_loader), desc='batch')
 #1000 datos // batch_size = 5
 auc_acum = np.empty(idx_end // batch_size)
 
+def auc2(arr):
+    """Returns normalized Area Under Curve of the array."""
+    return (arr.sum(0) - arr[0] / 2 - arr[-1] / 2) / (arr.shape[0] - 1)
 
-for i, (images, mask, target) in iterator:
-    scores = deletion.evaluate(images, mask.numpy(), batch_size)
+
+# df = pd.DataFrame()
+# df.index = [i for i in range(idx_end)]
+# df['file']=''
+# df['target']=''
+# df['googlenet_LIME']=''
+
+df = pd.read_pickle('auc_scores.pkl')
+df['alexnet_v4_tv'] = ''
+
+for i, (images, masks, targets, file_names) in iterator:
+    scores = deletion.evaluate(images, masks.numpy(), batch_size)
+    print(auc2(scores).mean())
     auc_acum[i] = auc(scores.mean(1))
-    #print(scores.shape)
+    aucs = auc2(scores)
+
+    for idx, file_name in enumerate(file_names):
+        # df.file[idx] = file_name.split('/')[-1].split('.JPEG')[0]
+        # df.target[idx] = targets[idx].numpy()
+        df.alexnet_v4_tv[idx] = aucs[idx]
 
     # pred = torch.nn.Softmax(dim=1)(model(images.cuda()))
     # for j, img in enumerate(images):
@@ -152,3 +179,5 @@ for i, (images, mask, target) in iterator:
     #     plt.show()
 
 print('puntaje total=', auc_acum.mean())
+
+df.to_pickle('auc_scores.pkl')

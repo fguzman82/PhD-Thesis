@@ -70,16 +70,16 @@
       <excludeFolder url="file://$MODULE_DIR$/resnet50_v4" />
       <excludeFolder url="file://$MODULE_DIR$/resnet50_v4_tv" />
       <excludeFolder url="file://$MODULE_DIR$/resnet50_v4_tv_0.05" />
-      <excludeFolder url="file://$MODULE_DIR$/resnet50_v4_tv_0.1" />
       <excludeFolder url="file://$MODULE_DIR$/vgg16_v4" />
       <excludeFolder url="file://$MODULE_DIR$/vgg16_v4_tv" />
-      <excludeFolder url="file://$MODULE_DIR$/vgg16_v4_tv_0.05" />
       <excludeFolder url="file://$MODULE_DIR$/vgg16_v4_tv_0.1" />
-      <excludeFolder url="file://$MODULE_DIR$/alexnet_v3" />
-      <excludeFolder url="file://$MODULE_DIR$/alexnet_v4" />
+      <excludeFolder url="file://$MODULE_DIR$/vgg16_v4_tv_0.05" />
       <excludeFolder url="file://$MODULE_DIR$/alexnet_v4_tv" />
       <excludeFolder url="file://$MODULE_DIR$/alexnet_v4_tv_0.1" />
       <excludeFolder url="file://$MODULE_DIR$/alexnet_v4_tv_0.05" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_v4" />
+      <excludeFolder url="file://$MODULE_DIR$/alexnet_v3" />
+      <excludeFolder url="file://$MODULE_DIR$/resnet50_v4_tv_0.1" />
     </content>
     <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver4)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
