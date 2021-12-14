@@ -54,18 +54,18 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    img_path = 'perro_gato.jpg'
+    # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    # img_path = 'example_2.JPEG'
+    img_path = 'example_2.JPEG'
     # img_path =  './dataset/0.JPEG'
     save_path = './output/'
 
     ## gt_category = 207  # Golden retriever
-    gt_category = 281  # tabby cat
+    # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    # gt_category = 565  # freight car
+    gt_category = 565  # freight car
     # gt_category = 732  # camara fotografica
 
     try:
@@ -106,7 +106,7 @@ if __name__ == '__main__':
                       'inception4e',
                       'inception5a',
                       'inception5b',
-                      'fc'
+                      # 'fc'
                       ]
 
     label_map = load_imagenet_label_map()
@@ -368,6 +368,7 @@ if __name__ == '__main__':
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
     plt.imshow(1 - mask_np)  # 1-mask para deletion
+    plt.axis('off')
     plt.show()
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
@@ -385,6 +386,7 @@ if __name__ == '__main__':
     img_transform_T = np.moveaxis(img_normal_np[0, :].transpose(), 0, 1)
     img_unormalize = np.uint8(255 * unnormalize(img_transform_T))
     plt.imshow(img_unormalize)
+    plt.axis('off')
     plt.show()
 
     # img_normal2 = transform(Image.fromarray(img_pert_unnorma)).unsqueeze(0)  # array -> PIL y retorna Tensor (1, 3, 224, 224)

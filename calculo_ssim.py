@@ -25,8 +25,8 @@ from skimage.feature import hog
 from scipy.stats import spearmanr, pearsonr
 from skimage.metrics import structural_similarity as ssim
 
-results_path1 = './output_v3'
-results_path2 = './output_v3_0.1'
+results_path1 = './output_v4_tv'
+results_path2 = './output_v4_tv_0.1'
 
 mask_path1 = os.listdir(results_path1)
 mask_path2 = os.listdir(results_path2)
@@ -80,9 +80,9 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 
-batch_size = 500
+batch_size = 5
 idx_start = 0
-idx_end = 500
+idx_end = 5
 #batch_size = 10
 mask_dataset = DataProcessing(img_idxs=[idx_start, idx_end])
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24, pin_memory=True)
@@ -96,6 +96,8 @@ for i, (mask1, mask2, hog_pear, ssim_resu) in iterator:
     mask2 = mask2.cuda()
     mask1 = mask1.reshape(mask1.size(0), 1, mask1.size(1), mask1.size(2))
     mask2 = mask2.reshape(mask2.size(0), 1, mask2.size(1), mask2.size(2))
+    print(ssim_resu)
+    print(hog_pear)
     print('SSIM = ', pytorch_ssim.ssim(mask1, mask2).cpu().numpy())
     print('Pearson HOG = ', hog_pear.mean())
     print('SSIM (individual) = ', ssim_resu.mean())

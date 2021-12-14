@@ -25,7 +25,7 @@ from tqdm import tqdm, trange
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './output_v4'
+results_path = './vgg16_SHAP'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
@@ -34,9 +34,6 @@ text_file = abs_path(input_dir_path)
 
 mask_filenames = os.listdir(results_path)
 mask_list = [i.split('_mask')[0] for i in mask_filenames]
-
-img_subset = [0, 2, 3, 5, 7, 14, 20, 24, 25, 33, 35, 32, 39, 47, 48, 49, 56, 59, 60, 77, 80, 111, 120, 121, 125,
-              126, 127, 128, 132, 155, 165, 166]
 
 img_name_list = []
 with open(text_file, 'r') as f:
@@ -57,8 +54,7 @@ class DataProcessing:
         self.data_path = data_path
         self.transform = transform
 
-        img_list = [img_name_list[i] for i in img_subset[img_idxs[0]:img_idxs[1]]]
-        # img_list = img_name_list[img_idxs[0]:img_idxs[1]]
+        img_list = img_name_list[img_idxs[0]:img_idxs[1]]
         #img_list = mask_list[img_idxs[0]:img_idxs[1]]
 
         self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
@@ -106,6 +102,7 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.imshow(inp, **kwargs)
     if title is not None:
         plt.title(title)
+    plt.axis('off')
     plt.show()
 
 
@@ -119,7 +116,7 @@ transform_val = transforms.Compose([
 
 batch_size = 2
 idx_start = 0 #22
-idx_end = 20 #22+5
+idx_end = 10 #22+5
 # batch_size = 10
 mask_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[idx_start, idx_end])
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24,
@@ -149,7 +146,8 @@ for i, (images, mask, target) in iterator:
         cl = cl.cpu().detach().numpy()[0]
         title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
         # title = 'target={}'.format(im_label_map.get(target_img))
-        tensor_imshow(img, title=title)
+        #tensor_imshow(img, title=title)
         mask_np = mask[j].numpy()
         plt.imshow(mask_np)
+        plt.axis('off')
         plt.show()

@@ -15,6 +15,7 @@ import torchvision.models as models
 sys.path.insert(0, './RISE')
 from utilsrise import *
 from explanations import RISE
+from evaluation import CausalMetric, auc, gkern
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
@@ -47,8 +48,8 @@ print('      {: >5} images will be explained.'.format(len(data_loader) * data_lo
 
 # Load black box model for explanations
 torch.cuda.set_device(0)
-model = models.googlenet(pretrained=True)
-model = nn.Sequential(model, nn.Softmax(dim=1))
+model1 = models.googlenet(pretrained=True)
+model = nn.Sequential(model1, nn.Softmax(dim=1))
 model = model.eval()
 model = model.cuda()
 
@@ -99,9 +100,13 @@ for i, (img, _) in enumerate(data_loader):
     plt.subplot(122)
     plt.axis('off')
     plt.title(get_class_name(c))
-    tensor_imshow(img[0])
+    # tensor_imshow(img[0])
     sal = explanations[i]
-    plt.imshow(sal, cmap='jet', alpha=0.5)
+    #plt.imshow(sal, cmap='jet', alpha=0.5)
     # plt.colorbar(fraction=0.046, pad=0.04)
-
+    plt.imshow(sal)
     plt.show()
+
+    deletion = CausalMetric(model1, 'del', 224, substrate_fn=torch.zeros_like)
+    h = deletion.single_run(img.cpu(), sal, verbose=1)
+    print('deletion score: ', auc(h))

@@ -15,6 +15,10 @@ import shutil
 import skimage
 import torchvision.transforms as transforms
 
+#bibliotecas RISE
+sys.path.insert(0, './RISE')
+from evaluation import CausalMetric, auc, gkern
+
 use_cuda = torch.cuda.is_available()
 
 # Fixing for deterministic results
@@ -53,17 +57,17 @@ if __name__ == '__main__':
     # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    # img_path = 'example_2.JPEG'
+    img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
-    img_path = './dataset/0.JPEG'
+    # img_path = './dataset/0.JPEG'
     save_path = './output/'
 
-    #gt_category = 207  # Golden retriever
+    # gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    # gt_category = 565  # freight car
-    gt_category = 1 # goldfish, Carassius auratus
+    gt_category = 565  # freight car
+    # gt_category = 1 # goldfish, Carassius auratus
     # gt_category = 732  # camara fotografica
 
     try:
@@ -91,7 +95,7 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize(256),
         transforms.CenterCrop(224+jitter),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -240,8 +244,9 @@ if __name__ == '__main__':
 
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (28, 28)
     mask_np = resize(np.moveaxis(mask_np.transpose(), 0, 1),(size, size))
-    plt.title('noise = {}'.format(noise))
+    #plt.title('noise = {}'.format(noise))
     plt.imshow(1 - mask_np)  # 1-mask para deletion
+    plt.axis('off')
     plt.show()
 
     transform_eval = transforms.Compose([
@@ -256,19 +261,12 @@ if __name__ == '__main__':
     img_eval = transform_eval(original_img_pil).unsqueeze(0)
 
     deletion = CausalMetric(model, 'del', 224, substrate_fn=torch.zeros_like)
-    h = deletion.single_run(img_eval, (1. - mask_np), verbose=0)
+    h = deletion.single_run(img_eval, (1. - mask_np), verbose=1)
     print('deletion score: ', auc(h))
 
-    klen = 11
-    ksig = 5
-    kern = gkern(klen, ksig)
-    # Function that blurs input image
-    blur = lambda x: torch.nn.functional.conv2d(x, kern, padding=klen // 2)
 
-    insertion = CausalMetric(model, 'ins', 224, substrate_fn=blur)
-    h = insertion.single_run(img_eval, (1. - mask_np), verbose=0)
-    print('insertion score: ', auc(h))
 
     np.save('fong_{}.npy'.format(noise), (1. - mask_np))
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
+

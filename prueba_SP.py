@@ -15,6 +15,9 @@ from tqdm import tqdm, trange
 import skimage
 from skimage.transform import resize
 
+sys.path.insert(0, './RISE')
+from evaluation import CausalMetric, auc, gkern
+
 use_cuda = torch.cuda.is_available()
 
 # Fixing for deterministic results
@@ -76,20 +79,20 @@ class occlusion_analysis:
 # img_path = 'dog.jpg'
 # img_path = 'example.JPEG'
 # img_path = 'example_2.JPEG'
-# img_path = 'goldfish.jpg'
-img_path = './dataset/0.JPEG'
+img_path = 'goldfish.jpg'
+# img_path = './dataset/0.JPEG'
 
 # gt_category = 207  # Golden retriever
 # gt_category = 281  # tabby cat
 # gt_category = 258  # "Samoyed, Samoyede"
 # gt_category = 282  # tigger cat
 # gt_category = 565  # freight car
-# gt_category = 1 # goldfish, Carassius auratus
-gt_category = 732  # camara fotografica
+gt_category = 1 # goldfish, Carassius auratus
+# gt_category = 732  # camara fotografica
 
 algo = 'SP'
 size = 224
-patch_size = 75
+patch_size = 35
 stride = 3
 
 dataset = 'imagenet'
@@ -163,6 +166,11 @@ heatmap = np.clip(heatmap, 0, 1)
 heatmap = resize(heatmap, (size, size))
 print(heatmap.shape)
 plt.imshow(heatmap)
+plt.axis('off')
 plt.show()
 
 print('Time taken: {:.3f}'.format(time.time() - init_time))
+
+deletion = CausalMetric(model, 'del', 224, substrate_fn=torch.zeros_like)
+h = deletion.single_run(img.cpu(), heatmap, verbose=1)
+print('deletion score: ', auc(h))

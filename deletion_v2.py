@@ -17,6 +17,10 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 from torchvision import models
 
+#bibliotecas RISE
+sys.path.insert(0, './RISE')
+from evaluation import CausalMetric, auc, gkern
+
 # sys.path.insert(0, './generativeimptorch')
 
 use_cuda = torch.cuda.is_available()
@@ -54,17 +58,19 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    img_path = 'perro_gato.jpg'
+    # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    # img_path = 'example_2.JPEG'
+    img_path = 'example_2.JPEG'
+    # img_path = 'goldfish.jpg'
     save_path = './output/'
 
-    ## gt_category = 207  # Golden retriever
-    gt_category = 281  # tabby cat
+    # gt_category = 207  # Golden retriever
+    # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    #gt_category = 565  # freight car
+    gt_category = 565  # freight car
+    # gt_category = 1  # goldfish, Carassius auratus
 
     try:
         shutil.rmtree(save_path)
@@ -353,6 +359,7 @@ if __name__ == '__main__':
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
     plt.imshow(1 - mask_np)  # 1-mask para deletion
+    plt.axis('off')
     plt.show()
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
@@ -370,6 +377,7 @@ if __name__ == '__main__':
     img_transform_T = np.moveaxis(img_normal_np[0, :].transpose(), 0, 1)
     img_unormalize = np.uint8(255 * unnormalize(img_transform_T))
     plt.imshow(img_unormalize)
+    plt.axis('off')
     plt.show()
 
     # img_normal2 = transform(Image.fromarray(img_pert_unnorma)).unsqueeze(0)  # array -> PIL y retorna Tensor (1, 3, 224, 224)
@@ -381,3 +389,15 @@ if __name__ == '__main__':
     org_softmax = torch.nn.Softmax(dim=1)(model(img_masked.cuda()))
     prob_orig = org_softmax.data[0, gt_category].cpu().detach().numpy()
     print('probabilidad de la mascara complemento=', prob_orig)
+
+    klen = 11
+    ksig = 5
+    kern = gkern(klen, ksig)
+    # Function that blurs input image
+    blur = lambda x: torch.nn.functional.conv2d(x, kern, padding=klen // 2)
+
+    deletion = CausalMetric(model, 'del', 224, substrate_fn=torch.zeros_like)
+    h = deletion.single_run(img_normal, (1. - mask_np), verbose=1)
+    print('deletion score: ', auc(h))
+
+

@@ -148,7 +148,7 @@ COCO_ds = CocoDetection(root=im_path,
 
 data_loader = torch.utils.data.DataLoader(COCO_ds, batch_size=1, shuffle=False,
                                           num_workers=8, pin_memory=True,
-                                          sampler=RangeSampler(range(40, 86))
+                                          sampler=RangeSampler(range(0, 86))
                                           )
 
 print('longitud data loader:', len(data_loader))
@@ -182,11 +182,13 @@ for i, (image, mask, path) in iterator:
     # print('path: ', path, ' iou = ', iou[iou_arg])
 
     # # title = 'p={:.1f} cat={}'.format(pr[idx], im_label_map.get(pred_target[idx]))
-    title = 'iou = {}'.format(iou[iou_arg])
+    title = 'iou = {}'.format(np.round(iou[iou_arg],3))
     tensor_imshow(image[0].cpu(), title=title)
+    # tensor_imshow(image[0].cpu())
     plt.axis('off')
     exp_mask_th = np.where(exp_mask > thres_vals[iou_arg], 1, 0)
     plt.imshow(exp_mask_th, cmap='jet', alpha=0.4)
+    # plt.imshow(gt_mask, cmap='jet', alpha=0.4)
     plt.show()
 
         # tensor_imshow(images[idx].cpu(), title='coco {}'.format(np.sum(gt_mask[idx, 0, :])))
@@ -211,7 +213,7 @@ print('CONSOLIDADO: ')
 print(iou_table)
 print(iou_table.mean(axis=0))
 
-print('error = ', np.where(iou_table[:, 1] <= 0.5, 1, 0).sum()/len(data_loader))
+print('error = ', np.where(iou_table[:, 1] <= 0.4, 1, 0).sum()/len(data_loader))
 
 # for i, (image, mask, path) in enumerate(data_loader):
 #     image.requires_grad = False

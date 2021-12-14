@@ -30,7 +30,7 @@ results_path_SP = './output_SP'
 results_path_LIME = './output_LIME'
 results_path_RISE = './output_RISE'
 results_path_MP = './output_MP'
-results_path_v4 = './output_v4'
+results_path_v4 = './output_v4_tv'
 
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
@@ -123,8 +123,8 @@ transform_val = transforms.Compose([
 ])
 
 batch_size = 1
-idx_start = 0 #22
-idx_end = 20 #22+5
+idx_start = 20 #22
+idx_end = 31 #22+5
 # batch_size = 10
 mask_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[idx_start, idx_end])
 mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, shuffle=False, num_workers=24,

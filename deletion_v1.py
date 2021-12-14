@@ -66,10 +66,10 @@ if __name__ == '__main__':
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
 
-    try:
-        shutil.rmtree(save_path)
-    except OSError as e:
-        print("Error: %s : %s" % (save_path, e.strerror))
+    # try:
+    #     shutil.rmtree(save_path)
+    # except OSError as e:
+    #     print("Error: %s : %s" % (save_path, e.strerror))
 
     # PyTorch random seed
     torch.manual_seed(0)
@@ -239,6 +239,7 @@ if __name__ == '__main__':
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
     plt.imshow(1 - mask_np)  # 1-mask para deletion
+    plt.axis('off')
     plt.show()
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
@@ -256,6 +257,7 @@ if __name__ == '__main__':
     img_transform_T = np.moveaxis(img_normal_np[0, :].transpose(), 0, 1)
     img_unormalize = np.uint8(255 * unnormalize(img_transform_T))
     plt.imshow(img_unormalize)
+    plt.axis('off')
     plt.show()
 
     # img_normal2 = transform(Image.fromarray(img_pert_unnorma)).unsqueeze(0)  # array -> PIL y retorna Tensor (1, 3, 224, 224)

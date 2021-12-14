@@ -18,25 +18,29 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import skimage
 
+#bibliotecas RISE
+sys.path.insert(0, './RISE')
+from evaluation import CausalMetric, auc, gkern
+
 use_cuda = torch.cuda.is_available()
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 
-img_path = 'perro_gato.jpg'
+# img_path = 'perro_gato.jpg'
 # img_path = 'dog.jpg'
 # img_path = 'example.JPEG'
 # img_path = 'example_2.JPEG'
-# img_path = 'goldfish.jpg'
+img_path = 'goldfish.jpg'
 # img_path = './dataset/0.JPEG'
 
 # gt_category = 207  # Golden retriever
-gt_category = 281  # tabby cat
+# gt_category = 281  # tabby cat
 # gt_category = 258  # "Samoyed, Samoyede"
 # gt_category = 282  # tigger cat
 # gt_category = 565  # freight car
-# gt_category = 1 # goldfish, Carassius auratus
+gt_category = 1 # goldfish, Carassius auratus
 # gt_category = 732  # camara fotografica
 
 if_pre = 0
@@ -51,8 +55,8 @@ save_path = './'
 dataset = 'imagenet'
 algo ='LIME'
 
-model = models.googlenet(pretrained=True)
-model = nn.Sequential(model, nn.Softmax(dim=1))
+model1 = models.googlenet(pretrained=True)
+model = nn.Sequential(model1, nn.Softmax(dim=1))
 model.to('cuda')
 model.eval()
 
@@ -70,7 +74,8 @@ def get_pytorch_preprocess_transform():
 
 def get_pil_transform():
     transf = transforms.Compose([
-        transforms.Resize((256, 256)),
+        #transforms.Resize((256, 256)),
+        transforms.Resize(256),
         transforms.CenterCrop(224)
     ])
 
@@ -103,7 +108,7 @@ if __name__ == '__main__':
 
 
     # Preprocess transform
-    pytorch_preprocessFn = transforms.Compose([transforms.Resize((256, 256)),
+    pytorch_preprocessFn = transforms.Compose([transforms.Resize(256),
                                                transforms.CenterCrop(224),
                                                transforms.ToTensor(),
                                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -150,6 +155,7 @@ if __name__ == '__main__':
     print('Time taken: {:.3f} secs'.format(time.time()-init_time))
     # print(pytorch_heatmap.shape)  #(224, 224)
     plt.imshow(pytorch_heatmap)
+    plt.axis('off')
     plt.show()
 
     # SAVE raw numpy values
@@ -163,3 +169,6 @@ if __name__ == '__main__':
                              .format(label_map[true_class].split(',')[0].split(' ')[0].split('-')[0], eval0))),
                 cv2.cvtColor(np.array(pill_transf(get_image(img_path))), cv2.COLOR_BGR2RGB))
 
+    deletion = CausalMetric(model1, 'del', 224, substrate_fn=torch.zeros_like)
+    h = deletion.single_run(pytorch_img.cpu(), pytorch_heatmap, verbose=1)
+    print('deletion score: ', auc(h))

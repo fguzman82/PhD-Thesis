@@ -106,18 +106,18 @@ if __name__ == '__main__':
     # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    # img_path = 'example_2.JPEG'
+    img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
-    img_path = './dataset/0.JPEG'
+    # img_path = './dataset/0.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    # gt_category = 565  # freight car
+    gt_category = 565  # freight car
     # gt_category = 1 # goldfish, Carassius auratus
-    gt_category = 732  # camara fotografica
+    # gt_category = 732  # camara fotografica
 
     try:
         shutil.rmtree(save_path)
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     max_iterations = 228 #130 *2
     l1_coeff = 0.01e-5*2  # *2 *4 *0.5 (robusto)
     size = 224
-    noise = 0.05
+    noise = 0
 
     tv_beta = 3
     tv_coeff = 1e-2
@@ -213,7 +213,8 @@ if __name__ == '__main__':
 
     # normalización de acuerdo al promedio y desviación std de Imagenet
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        #transforms.Resize((256, 256)),
+        transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -459,10 +460,10 @@ if __name__ == '__main__':
     # plt.show()
     print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
 
-    plt.plot(loss_np)
-    plt.ylabel('loss')
-    plt.xlabel('# iter')
-    plt.show()
+    # plt.plot(loss_np)
+    # plt.ylabel('loss')
+    # plt.xlabel('# iter')
+    # plt.show()
 
     # plt.plot(pred_mask_np)
     # plt.ylabel('prob')
@@ -476,8 +477,9 @@ if __name__ == '__main__':
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
     mask_np = resize(np.moveaxis(mask_np.transpose(), 0, 1), (size, size))
-    plt.title('noise = {}'.format(noise))
+    # plt.title('noise = {}'.format(noise))
     plt.imshow(1-mask_np)  # 1-mask para deletion
+    plt.axis('off')
     plt.show()
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
@@ -488,13 +490,14 @@ if __name__ == '__main__':
     mask_tensor = numpy_to_torch2(1 - mask_np)  # tensor (1, 1, 224, 224)
     mask_expanded = mask_tensor.expand(1, 3, mask.size(2), mask.size(3))  # tensor (1, 3, 224, 224)
     null_img = torch.zeros(1, 3, size, size)
-    img_masked = img_normal.mul(upsample(mask_expanded))+null_img_blur.mul(1 - mask_expanded)
+    img_masked = img_normal.mul(upsample(mask_expanded))#+null_img_blur.mul(1 - mask_expanded)
 
     # transforma de (PIL o tensor) de (1,3,224,224) a np; desnormaliza y grafica
     img_normal_np = img_masked.numpy()
     img_transform_T = np.moveaxis(img_normal_np[0, :].transpose(), 0, 1)
     img_unormalize = np.uint8(255 * unnormalize(img_transform_T))
     plt.imshow(img_unormalize)
+    plt.axis('off')
     plt.show()
 
     # img_normal2 = transform(Image.fromarray(img_pert_unnorma)).unsqueeze(0)  # array -> PIL y retorna Tensor (1, 3, 224, 224)
