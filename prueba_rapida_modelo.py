@@ -71,17 +71,23 @@ transform = transforms.Compose([
 
 im_label_map = imagenet_label_mappings()
 
+imgs = np.load('adv_im.npy')
+
 original_img_pil = Image.open(img_path).convert('RGB')
 img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
 img_normal.requires_grad = False
 img_normal = img_normal.cuda()
 
+img_batch = torch.from_numpy(imgs).cuda()
+img_batch = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])(img_batch)
 
-pred = torch.nn.Softmax(dim=1)(model(img_normal))  # tensor(1,1000)
+pred = torch.nn.Softmax(dim=1)(model(img_batch))  # tensor(1,1000)
 pr, cl = torch.topk(pred, 1)
-pr = pr.cpu().detach().numpy()[0][0]
-pred_target = cl.cpu().detach().numpy()[0][0]
-print('prob={:.1f} cat={}'.format(pr, im_label_map.get(pred_target)))
+for i in range(imgs.shape[0]):
+    prob = pr.cpu().detach().numpy()[i][0]
+    pred_target = cl.cpu().detach().numpy()[i][0]
+    print('prob={:.1f} cat={}'.format(prob, im_label_map.get(pred_target)))
 
 
 

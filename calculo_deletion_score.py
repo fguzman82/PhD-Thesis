@@ -26,7 +26,7 @@ import pandas as pd
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './alexnet_v4_tv'
+results_path = './vgg16_SHAP'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
@@ -152,7 +152,7 @@ def auc2(arr):
 # df['googlenet_LIME']=''
 
 df = pd.read_pickle('auc_scores.pkl')
-df['alexnet_v4_tv'] = ''
+df['vgg16_SHAP'] = ''
 
 for i, (images, masks, targets, file_names) in iterator:
     scores = deletion.evaluate(images, masks.numpy(), batch_size)
@@ -163,7 +163,7 @@ for i, (images, masks, targets, file_names) in iterator:
     for idx, file_name in enumerate(file_names):
         # df.file[idx] = file_name.split('/')[-1].split('.JPEG')[0]
         # df.target[idx] = targets[idx].numpy()
-        df.alexnet_v4_tv[idx] = aucs[idx]
+        df.vgg16_SHAP[idx] = aucs[idx]
 
     # pred = torch.nn.Softmax(dim=1)(model(images.cuda()))
     # for j, img in enumerate(images):

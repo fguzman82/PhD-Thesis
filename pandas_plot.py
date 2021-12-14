@@ -13,16 +13,22 @@ columns = [ 'googlenet_LIME',
  'googlenet_v4',
  'googlenet_v4_tv']
 
+columns_vgg= ['vgg16_LIME', 'vgg16_SHAP', 'vgg16_MP', 'vgg16_RISE', 'vgg16_SP',
+       'vgg16_v2', 'vgg16_v3', 'vgg16_v4', 'vgg16_v4_tv']
+
 columnsedit = ['LIME', 'MP', 'RISE', 'SP', 'MIC', 'MIC_blur', 'MIC_inp', 'MIC_inp_tv']
 
-dfmean = np.round(df[columns].mean().tolist(),3)
+columnsedit_vgg = ['LIME', 'SHAP', 'MP', 'RISE', 'SP', 'MIC', 'MIC_blur', 'MIC_inp', 'MIC_inp_tv']
+
+dfmean = np.round(df[columns_vgg].mean().tolist(),3)
 dfstd = np.round(df[columns].std().tolist(),3)
 fig, ax = plt.subplots(figsize=(7,6))
-xpos = np.arange(len(columns))
+xpos = np.arange(len(columns_vgg))
 rects1 = ax.bar(xpos, dfmean, align='center', alpha=0.5, ecolor='black', capsize=10) #yerr=dfstd
-rects1[4].set_color('g')
+rects1[5].set_color('g')
+rects1[1].set_color('r')
 ax.set_xticks(xpos)
-ax.set_xticklabels(columnsedit, rotation=45)
+ax.set_xticklabels(columnsedit_vgg, rotation=45)
 ax.legend()
 ax.set_ylabel('Puntaje Borrado')
 ax.set_title('Red GoogleNet - Dataset ImageNet (promedio de 1000 muestras)')
