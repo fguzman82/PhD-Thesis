@@ -31,7 +31,7 @@ ax.set_xticks(xpos)
 ax.set_xticklabels(columnsedit_vgg, rotation=45)
 ax.legend()
 ax.set_ylabel('Puntaje Borrado')
-ax.set_title('Red GoogleNet - Dataset ImageNet (promedio de 1000 muestras)')
+ax.set_title('Red VGG16 - Dataset ImageNet (promedio de 1000 muestras)')
 ax.yaxis.grid(True)
 
 ax.bar_label(rects1, padding=3)

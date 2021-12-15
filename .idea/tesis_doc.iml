@@ -81,6 +81,7 @@
       <excludeFolder url="file://$MODULE_DIR$/alexnet_v3" />
       <excludeFolder url="file://$MODULE_DIR$/resnet50_v4_tv_0.1" />
       <excludeFolder url="file://$MODULE_DIR$/vgg16_SHAP" />
+      <excludeFolder url="file://$MODULE_DIR$/googlenet_v2_gen" />
     </content>
     <orderEntry type="jdk" jdkName="Remote Python 3.8.12 Docker (pytorch:ver5)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

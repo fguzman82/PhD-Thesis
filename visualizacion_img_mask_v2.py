@@ -27,10 +27,10 @@ sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
 results_path_SP = './vgg16_SHAP'
-results_path_LIME = './output_LIME'
-results_path_RISE = './output_RISE'
-results_path_MP = './output_MP'
-results_path_v4 = './vgg16_v4'
+results_path_LIME = './vgg16_LIME'
+results_path_RISE = './vgg16_RISE'
+results_path_MP = './vgg16_MP'
+results_path_v4 = './vgg16_v2'
 
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
@@ -146,14 +146,14 @@ im_label_map = imagenet_label_mappings()
 iterator = tqdm(enumerate(mask_loader), total=len(mask_loader), desc='batch')
 
 df = pd.read_pickle('auc_scores.pkl')
-cols_list = ['googlenet_SHAP', 'googlenet_LIME', 'googlenet_v4', 'googlenet_MP', 'googlenet_RISE']
+cols_list = ['vgg16_SHAP', 'vgg16_LIME', 'vgg16_v4', 'vgg16_MP', 'vgg16_RISE']
 
 
 def plot_masks(nrows, ncols, mask_arr, orig_img, file_name, titles):
     # fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(7.5, 3))
     filename = file_name.split('/')[-1].split('.JPEG')[0]
     df2 = df[df.file == filename]
-    print(df2)
+    # print(df2)
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
     fig.subplots_adjust(left=0, bottom=0, right=1, top=0.95, wspace=0.03, hspace=0.12)
     axes = np.reshape(axes, (nrows, ncols))
@@ -183,7 +183,7 @@ def plot_masks(nrows, ncols, mask_arr, orig_img, file_name, titles):
                 ax.spines['bottom'].set_visible(False)
                 ax.spines['left'].set_visible(False)
                 ax.set_title(titles[index])
-                #ax.text(160, 205, np.round(df2[cols_list[index]].item(), 3), color='black', bbox=dict(facecolor='white', alpha=1))
+                ax.text(160, 205, np.round(df2[cols_list[index]].item(), 3), color='black', bbox=dict(facecolor='white', alpha=1))
                 ax.set_xticks([])
                 ax.set_yticks([])
                 index=index+1

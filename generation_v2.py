@@ -53,17 +53,17 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    #img_path = 'perro_gato.jpg'
-    #img_path = 'dog.jpg'
+    # img_path = 'perro_gato.jpg'
+    img_path = 'dog.jpg'
     # img_path = 'example.JPEG'
-    img_path = 'example_2.JPEG'
+    # img_path = 'example_2.JPEG'
     save_path = './output/'
 
     # gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
-    # gt_category = 258  # "Samoyed, Samoyede"
+    gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    # gt_category = 565  # freight car
 
     try:
         shutil.rmtree(save_path)

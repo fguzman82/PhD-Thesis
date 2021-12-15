@@ -113,7 +113,7 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 init_time = time.time()
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 4], if_noise=1, noise_var=0.1)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 4], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=10, shuffle=False, num_workers=24, pin_memory=True)
 
 # especificar cual gpu 0 o 1

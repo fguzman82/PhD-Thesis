@@ -27,6 +27,7 @@ sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
 results_path = './vgg16_SHAP'
+# results_path = './googlenet_v3_gen'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'

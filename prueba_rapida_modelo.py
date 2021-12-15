@@ -1,3 +1,4 @@
+# se utilizó temporalmente para pruebas de recuperación de conceptos
 import argparse
 import os
 import random
@@ -83,11 +84,15 @@ img_batch = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                          std=[0.229, 0.224, 0.225])(img_batch)
 
 pred = torch.nn.Softmax(dim=1)(model(img_batch))  # tensor(1,1000)
-pr, cl = torch.topk(pred, 1)
+pr, cl = torch.topk(pred, 10)
+
 for i in range(imgs.shape[0]):
-    prob = pr.cpu().detach().numpy()[i][0]
-    pred_target = cl.cpu().detach().numpy()[i][0]
-    print('prob={:.1f} cat={}'.format(prob, im_label_map.get(pred_target)))
+    prob = pr.cpu().detach().numpy()[i]
+    pred_target = cl.cpu().detach().numpy()[i]
+    # pred_list = [im_label_map.get(i) for i in pred_target]
+    pred_list = [i for i in pred_target]
+    print(list(zip(pred_list, np.round(prob, 4).tolist())))
+    #print('prob={:.1f} cat={}'.format(prob, im_label_map.get(pred_target)))
 
 
 
