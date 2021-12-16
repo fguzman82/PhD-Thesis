@@ -110,28 +110,29 @@ model, _ = make_and_restore_model(arch='googlenet', dataset=ds, pytorch_pretrain
 model.eval()
 model.cuda()
 
+attack_kwargs = {
+    'constraint': 'inf',  # L-inf PGD
+    'eps': 0.05,  # Epsilon constraint (L-inf norm)
+    'step_size': 0.01,  # Learning rate for PGD
+    'iterations': 100,  # Number of PGD steps
+    'targeted': True,  # Targeted attack
+    'do_tqdm': True,
+}
+
+# # ok
 # attack_kwargs = {
 #     'constraint': 'inf',  # L-inf PGD
-#     'eps': 0.05,  # Epsilon constraint (L-inf norm)
+#     'eps': 1.5,  # Epsilon constraint (L-inf norm)
 #     'step_size': 0.01,  # Learning rate for PGD
-#     'iterations': 100,  # Number of PGD steps
+#     'iterations': 10,  # Number of PGD steps
 #     'targeted': True,  # Targeted attack
 #     'do_tqdm': True,
 # }
 
-attack_kwargs = {
-    'constraint': 'inf',  # L-inf PGD
-    'eps': 1.5,  # Epsilon constraint (L-inf norm)
-    'step_size': 0.01,  # Learning rate for PGD
-    'iterations': 10,  # Number of PGD steps
-    #'targeted': True,  # Targeted attack
-    'do_tqdm': True,
-}
-
 # suave
 # attack_kwargs = {
 #     'constraint': '2',  # L-inf PGD
-#     'eps': 20,  # Epsilon constraint (L-inf norm)
+#     'eps': 2,  # Epsilon constraint (L-inf norm) #20 (intermedio) #0.5 muy suave
 #     'step_size': 0.1,  # Learning rate for PGD
 #     'iterations': 50,  # Number of PGD steps
 #     'targeted': True,  # Targeted attack
@@ -162,7 +163,7 @@ for i, (images, label, path) in iterator:
     adv_out, adv_im = model(images, target_label, make_adv=True, **attack_kwargs)
     adv_im_full.append(adv_im.cpu().numpy())
 
-np.save('adv_im.npy', np.array(adv_im_full).reshape(-1,3,224,224))
+np.save('adv_im_MRC_strong.npy', np.array(adv_im_full).reshape(-1,3,224,224))
 
 # visualización de la imagen adversaria [0]
 # inp = np.array(adv_im_full).reshape(-1,3,224,224)[0].transpose((1, 2, 0))

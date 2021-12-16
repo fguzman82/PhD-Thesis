@@ -45,7 +45,7 @@ def imagenet_label_mappings():
 
 
 class DataProcessing:
-    def __init__(self, data_path, transform, img_idxs=[0, 1], if_noise=0, noise_var=0):
+    def __init__(self, data_path, transform, img_idxs=[0, 1], if_noise=0, noise_var=0.0):
         self.data_path = data_path
         self.transform = transform
         self.if_noise = if_noise
@@ -113,7 +113,7 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 init_time = time.time()
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 4], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10], if_noise=1, noise_var=1.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=10, shuffle=False, num_workers=24, pin_memory=True)
 
 # especificar cual gpu 0 o 1
@@ -132,10 +132,10 @@ for i, (images, target, path) in iterator:
     pred = torch.nn.Softmax(dim=1)(model(images))
     target = target.numpy()
 
-    for i, file in enumerate(path):
-        print('./dataset/{}.JPEG'.format(i))
-        #shutil.copyfile(file, './dataset/{}'.format(file.split('/')[-1]))
-        #shutil.copyfile(file, './dataset/{}.JPEG'.format(i))
+    # for i, file in enumerate(path):
+    #     print('./dataset/{}.JPEG'.format(i))
+    #     shutil.copyfile(file, './dataset/{}'.format(file.split('/')[-1]))
+    #     shutil.copyfile(file, './dataset/{}.JPEG'.format(i))
 
     for j, img in enumerate(images):
         target_img = target[j].item()

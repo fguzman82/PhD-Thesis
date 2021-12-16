@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 # buenos resultados con MP, V2, V4?
 # results_path = './googlenet_v2_gen'
-results_path = './output_v4_0.05'
+results_path = './output_MP_0.05'
 
 val_dir = './val'
 imagenet_val_xml_path = './val_bb'
@@ -40,10 +40,9 @@ def imagenet_label_mappings():
 
 
 class DataProcessing:
-    def __init__(self, data_path, transform, img_idxs=[0, 1], if_noise=0, noise_var=0.0):
+    def __init__(self, data_path, transform, img_idxs=[0, 1], noise_var=0.0):
         self.data_path = data_path
         self.transform = transform
-        self.if_noise = if_noise
         self.noise_mean = 0
         self.noise_var = noise_var
 
@@ -52,17 +51,17 @@ class DataProcessing:
         self.mask_filenames = [os.path.join(results_path, '{}_mask.npy'.format(i)) for i in img_list]
 
     def __getitem__(self, index):
-        img = Image.open(os.path.join(self.data_path, self.img_filenames[index])).convert('RGB')
+        img_orig = Image.open(os.path.join(self.data_path, self.img_filenames[index])).convert('RGB')
         target = self.get_image_class(os.path.join(self.data_path, self.img_filenames[index]))
         mask = np.load(self.mask_filenames[index])
-        if self.if_noise == 1:
-            img = skimage.util.random_noise(np.asarray(img), mode='gaussian',
-                                            mean=self.noise_mean, var=self.noise_var,
-                                            )  # numpy, dtype=float64,range (0, 1)
-            img = Image.fromarray(np.uint8(img * 255))
 
-        img = self.transform(img)
-        return img, mask.reshape(1, 224, 224), target, os.path.join(self.data_path, self.img_filenames[index])
+        img_noise = skimage.util.random_noise(np.asarray(img_orig), mode='gaussian',
+                                        mean=self.noise_mean, var=self.noise_var,
+                                        )  # numpy, dtype=float64,range (0, 1)
+        img_noise = Image.fromarray(np.uint8(img_noise * 255))
+        img_orig = self.transform(img_orig)
+        img_noise = self.transform(img_noise)
+        return img_orig, img_noise, mask.reshape(1, 224, 224), target, os.path.join(self.data_path, self.img_filenames[index])
         # return img, target
 
     def __len__(self):
@@ -109,7 +108,7 @@ def tensor_imshow(inp, title=None, **kwargs):
 
 im_label_map = imagenet_label_mappings()
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 25], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 25], noise_var=0.7)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=25, shuffle=False, num_workers=10, pin_memory=True)
 
 torch.cuda.set_device(0)
@@ -124,45 +123,28 @@ model.eval()
 for p in model.parameters():
     p.requires_grad = False
 
-########## Se carga el batch de imágenes adversarias ############
-imgs_adv = np.load('adv_im_224.npy')
-adv_batch = torch.from_numpy(imgs_adv).cuda()
-adv_batch = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])(adv_batch)
-
-preds_adv = torch.nn.Softmax(dim=1)(model(adv_batch[0:val_loader.batch_size]))  # tensor(200,1000)
-probs_adv, labels_adv = torch.topk(preds_adv, 10)  # Top 10 predicciones adversarias (200, 10)
-##################################################################
-print('etiquetas adv')
-for i in range(val_loader.batch_size):
-    prob = probs_adv.cpu().detach().numpy()[i]
-    pred_target = labels_adv.cpu().detach().numpy()[i]
-    pred_list = [i for i in pred_target]
-    print(pred_list)
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
 # top_cnt_full = torch.empty((val_loader.batch_size, 10), dtype=torch.bool)
 top_cnt_full = []
 
-for i, (images, masks, targets, file_names) in iterator:
+for i, (images, images_noise, masks, targets, file_names) in iterator:
     images_orig = images.cuda()
+    images_noise = images_noise.cuda()
     targets_orig = targets.numpy()  # las y originales
 
     # predicciones originales
     preds_orig = torch.nn.Softmax(dim=1)(model(images_orig))
     probs_orig, labels_orig = torch.topk(preds_orig, 10)  # Top 10 predicciones originales
 
-    # _, orig_labels = torch.max(preds_orig, 1)
-    # np.save('adv_orig_labels.npy', orig_labels.cpu().detach().numpy())
-
-    # reenmascaramiento de img adv con explicacion
+    # reenmascaramiento de img noise con explicacion
     extended_mask = masks.expand(masks.size(0), 3, 224, 224)
-    adv_masked = adv_batch[0:masks.size(0)].mul(extended_mask.cuda())
-    adv_masked = adv_masked.to(torch.float32)
+    noise_masked = images_noise.mul(extended_mask.cuda())
+    noise_masked = noise_masked.to(torch.float32)
 
     # prediccion reenmascaramiento
-    preds_masked = torch.nn.Softmax(dim=1)(model(adv_masked))  # tensor(10,1000)
+    preds_masked = torch.nn.Softmax(dim=1)(model(images_noise))  # tensor(10,1000)
     probs_masked, labels_masked = torch.topk(preds_masked, 1000)  # predicciones recuperadas
 
     for i in range(val_loader.batch_size):  # se itera en el tamaño del batch

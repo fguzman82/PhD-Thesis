@@ -146,7 +146,7 @@ for i, (images, mask, target) in iterator:
         cl = cl.cpu().detach().numpy()[0]
         title = 'p={:.1f} p={} t={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
         # title = 'target={}'.format(im_label_map.get(target_img))
-        #tensor_imshow(img, title=title)
+        tensor_imshow(img, title=title)
         mask_np = mask[j].numpy()
         plt.imshow(mask_np)
         plt.axis('off')
