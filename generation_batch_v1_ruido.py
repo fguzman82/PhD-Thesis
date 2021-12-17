@@ -41,12 +41,12 @@ imagenet_class_mappings = './imagenet_class_mappings'
 torch.manual_seed(0)
 learning_rate = 0.1
 max_iterations = 301
-l1_coeff = 1e-3 #1e-6 #2*1e-7
+l1_coeff = 1e-3/10  #1e-3 #1e-6 #2*1e-7
 size = 224
 
 tv_beta = 3
 tv_coeff = 1e-2
-factorTV = 1   # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+factorTV = 0.1 #0.1   # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
 
 def tv_norm(input, tv_beta):
@@ -132,11 +132,11 @@ def my_explanation(img_batch, max_iterations, gt_category):
         mask.data.clamp_(0, 1)
 
 
-    mask_np = (mask.cpu().detach().numpy())
-
-    for i in range(mask_np.shape[0]):
-        plt.imshow(mask_np[i, 0, :, :])
-        plt.show()
+    # mask_np = (mask.cpu().detach().numpy())
+    #
+    # for i in range(mask_np.shape[0]):
+    #     plt.imshow(mask_np[i, 0, :, :])
+    #     plt.show()
 
     return mask
 
@@ -199,13 +199,17 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 50], noise_var=1.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 200], noise_var=2.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=25, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
+
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-top_cnt_full = []
+recov_top_cnt_full = []
+pertb_top_cnt_full = []
+pertb_radio = []
+recov_radio = []
 
 for i, (imgs_orig, imgs_noise, targets, file_names) in iterator:
     imgs_orig.requires_grad = False
@@ -239,26 +243,59 @@ for i, (imgs_orig, imgs_noise, targets, file_names) in iterator:
         label_masked = labels_masked.cpu().detach()[i]  # (1000,)
         label_noise = labels_noise.cpu().detach()[i]
 
+        # se buscan donde estan las etiquetas originales dentro de las perturbadas
+        pertub_pos_list = [torch.where(label_noise == label_orig_item)[0].item() for label_orig_item in label_orig]
+        pertub_pos_list_tensor = torch.tensor(pertub_pos_list)
+        pertb_radio.append(pertub_pos_list_tensor)
+        pertb_top_cnt = [torch.where(pertub_pos_list_tensor <= i)[0].nelement() >= 1 for i in range(10)]
+        pertb_top_cnt_full.append(torch.tensor(pertb_top_cnt))
+
         # se buscan donde estan las etiquetas originales dentro de las recuperadas
-        pos_list = [torch.where(label_masked == label_orig_item)[0].item() for label_orig_item in label_orig]
-        pos_list_tensor = torch.tensor(pos_list)
+        recov_pos_list = [torch.where(label_masked == label_orig_item)[0].item() for label_orig_item in label_orig]
+        recov_pos_list_tensor = torch.tensor(recov_pos_list)
+        recov_radio.append(recov_pos_list_tensor)
         # el indice de pos_list_tensor determina el rango de predicciones a incluir en el top 10
         # por ejemplo pos_list_tensor[0] analiza el top 10 de la primera prediccion original en el grupo de recuperados
         # pos_list_tensor[0:4] analiza el top 10 del grupo de las 3 primeras predicciones originales en el grupo recup
-        top_cnt = [torch.where(pos_list_tensor[0] <= i)[0].nelement() >= 1 for i in range(10)]
-        top_cnt_full.append(torch.tensor(top_cnt))
-        # se buscan donde estan las etiquetas originales dentro de las recuperadas perturbadas
-        pos_list_n = [torch.where(label_noise == label_orig_item)[0].item() for label_orig_item in label_orig]
+        recov_top_cnt = [torch.where(recov_pos_list_tensor <= i)[0].nelement() >= 1 for i in range(10)]
+        recov_top_cnt_full.append(torch.tensor(recov_top_cnt))
 
         print('orig label, muestra', i, ': ', label_orig.tolist())
-        print('pos orig en recuperado  ', pos_list)
-        print('lista top 10 recuperados acum ', top_cnt)
+        print('pos orig en recuperado  ', recov_pos_list)
+        print('lista top 10 recuperados acum ', recov_top_cnt)
         print('lista de recuperados    ', label_masked[0:10].tolist())
         print('lista de perturbados    ', label_noise[0:10].tolist())
-        print('pos orig en perturbado  ', pos_list_n)
+        print('pos orig en perturbado  ', pertub_pos_list)
 
         print('')
 
-temp = torch.stack(top_cnt_full)
-print(torch.stack(top_cnt_full).sum(0)/val_loader.batch_size)
+
+recov_table = torch.stack(recov_top_cnt_full)
+recov_stats = recov_table.sum(0)/(val_loader.batch_size*len(val_loader))
+
+pertb_table = torch.stack(pertb_top_cnt_full)
+pertb_stats = pertb_table.sum(0)/(val_loader.batch_size*len(val_loader))
+
+print('estado despues de perturbar')
+print(pertb_stats)
+print('')
+
+
+print('estado despues de recuperar')
+print(recov_stats)
+print('')
+
+pr = torch.stack(pertb_radio).float()
+print('radio perturbacion')
+print(pr)
+print('promedio')
+print(pr.mean(0))
+print('')
+
+rr = torch.stack(recov_radio).float()
+print('radio recuperacion')
+print(rr)
+print('promedio')
+print(rr.mean(0))
+print('')
 print('Time taken: {:.3f}'.format(time.time() - init_time))
