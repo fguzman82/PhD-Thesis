@@ -113,7 +113,7 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 init_time = time.time()
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 10], if_noise=1, noise_var=2.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 25], if_noise=0, noise_var=0)   #0.1 0.5 1.0 1.5
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=10, shuffle=False, num_workers=24, pin_memory=True)
 
 # especificar cual gpu 0 o 1
@@ -143,7 +143,8 @@ for i, (images, target, path) in iterator:
         pr = pr.cpu().detach().numpy()[0]
         cl = cl.cpu().detach().numpy()[0]
         # title = 'p={:.2f} cat={} true={}'.format(pr, im_label_map.get(cl), im_label_map.get(target_img))
-        title = 'p={:.2f} cat={}'.format(pr, im_label_map.get(cl))
+        # title = 'p={:.2f} cat={}'.format(pr, im_label_map.get(cl))
+        title = path[j].split('/')[-1].split('.JPEG')[0]
         tensor_imshow(img.cpu(), title=title)
 
 

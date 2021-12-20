@@ -297,7 +297,29 @@ def my_explanation(img_batch, max_iterations, gt_category):
     mask_np = (mask.cpu().detach().numpy())
 
     for i in range(mask_np.shape[0]):
-        plt.imshow(1 - mask_np[i, 0, :, :])
+        fig = plt.figure()
+        fig.subplots_adjust(left=0.03, bottom=0, right=0.97, top=1, wspace=0.1, hspace=0.1)
+        fig.set_size_inches(12, 5)
+        ax = fig.add_subplot(1, 3, 1)
+        inp = img_batch[i].cpu().numpy().transpose((1, 2, 0))
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        inp = std * inp + mean
+        inp = np.clip(inp, 0, 1)
+        ax.imshow(inp)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax = fig.add_subplot(1, 3, 2)
+        mask_rz = mask_np[i, 0, :, :]
+        ax.imshow(mask_rz)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax = fig.add_subplot(1, 3, 3)
+        img_masked = np.multiply(inp, np.repeat(np.expand_dims(mask_rz, axis=2), 3, axis=2))
+        ax.imshow(img_masked)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        # fig.tight_layout()
         plt.show()
 
     return mask
@@ -307,7 +329,7 @@ def my_explanation(img_batch, max_iterations, gt_category):
 init_time = time.time()
 
 ########## Se carga el batch de imágenes adversarias ############
-imgs_adv = np.load('adv_im.npy')
+imgs_adv = np.load('adv_im_MRC_strong.npy')
 adv_batch = torch.from_numpy(imgs_adv)
 adv_batch = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])(adv_batch)
@@ -374,13 +396,16 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 25], if_noise=1, noise_var=0.1)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 25], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=25, shuffle=False, num_workers=10,
                                          pin_memory=True)
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-top_cnt_full = []
+recov_top_cnt_full = []
+pertb_top_cnt_full = []
+pertb_radio = []
+recov_radio = []
 
 for i, (images, imgs_adv, target, file_names) in iterator:
     imgs_adv.requires_grad = False
@@ -391,12 +416,16 @@ for i, (images, imgs_adv, target, file_names) in iterator:
     preds_orig = torch.nn.Softmax(dim=1)(model(images_orig))
     probs_orig, labels_orig = torch.topk(preds_orig, 10)  # Top 10 predicciones originales
 
+    preds_adv = torch.nn.Softmax(dim=1)(model(imgs_adv))  # tensor(n_batch,1000)
+    probs_adv, labels_adv = torch.topk(preds_adv, 1000)  # Top 1 predicciones adversarias
+    _, labels_adv_top = torch.max(preds_adv, 1)
+
     # obtención de explicaciones para imágenes adversarias
     _, orig_labels = torch.max(preds_orig, 1) # labels originales para generar las explicaciones
-    mask = my_explanation(imgs_adv, max_iterations, orig_labels)
+    mask = my_explanation(imgs_adv, max_iterations, labels_adv_top)
 
     # reenmascaramiento de img adv con explicación
-    adv_masked = imgs_adv.mul(1. - mask)
+    adv_masked = imgs_adv.mul(mask)
     adv_masked = adv_masked.to(torch.float32)
 
     # prediccion reenmascaramiento
@@ -409,19 +438,68 @@ for i, (images, imgs_adv, target, file_names) in iterator:
 
         prob_masked = probs_masked.cpu().detach()[i]  # (1000,)
         label_masked = labels_masked.cpu().detach()[i]  # (1000,)
+        label_adv = labels_adv.cpu().detach()[i]
+
+        prob_adv = probs_adv.cpu().detach()[i]
+
+        # se buscan donde estan las etiquetas originales dentro de las perturbadas
+        pertub_pos_list = [torch.where(label_adv == label_orig_item)[0].item() for label_orig_item in label_orig]
+        pertub_pos_list_tensor = torch.tensor(pertub_pos_list)
+        pertb_radio.append(pertub_pos_list_tensor)
+        pertb_top_cnt = [torch.where(pertub_pos_list_tensor <= i)[0].nelement() >= 1 for i in range(10)]
+        pertb_top_cnt_full.append(torch.tensor(pertb_top_cnt))
 
         # se buscan donde estan las etiquetas originales dentro de las recuperadas
-        pos_list = [torch.where(label_masked == label_orig_item)[0].item() for label_orig_item in label_orig]
-        pos_list_tensor = torch.tensor(pos_list)
-        top_cnt = [torch.where(pos_list_tensor <= i)[0].nelement() >= 1 for i in range(10)]
-        top_cnt_full.append(torch.tensor(top_cnt))
+        recov_pos_list = [torch.where(label_masked == label_orig_item)[0].item() for label_orig_item in label_orig]
+        recov_pos_list_tensor = torch.tensor(recov_pos_list)
+        recov_radio.append(recov_pos_list_tensor)
+        # el indice de pos_list_tensor determina el rango de predicciones a incluir en el top 10
+        # por ejemplo pos_list_tensor[0] analiza el top 10 de la primera prediccion original en el grupo de recuperados
+        # pos_list_tensor[0:4] analiza el top 10 del grupo de las 3 primeras predicciones originales en el grupo recup
+        recov_top_cnt = [torch.where(recov_pos_list_tensor <= i)[0].nelement() >= 1 for i in range(10)]
+        recov_top_cnt_full.append(torch.tensor(recov_top_cnt))
 
-        print('orig label, muestra', i, ': ', label_orig.tolist())
-        print('pos orig en recuperado  ', pos_list)
-        print('lista top 10 recuperados acum ', top_cnt)
-        print('lista de recuperados    ', label_masked[0:10].tolist())
-
+        print('muestra ', file_names[i].split('/')[-1].split('.JPEG')[0])
+        print('top 10 muestra original: ', label_orig.tolist())
+        print('top 10 muestra original (decod): ', [im_label_map.get(label) for label in label_orig.tolist()])
+        print('top 10 prob muestra original (%): ', [round(num * 100, 2) for num in prob_orig.tolist()])
+        print('lista top 10 recuperados acum ', recov_top_cnt)
+        print('top 10 perturbados    ', label_adv[0:10].tolist())
+        print('top 10 perturbados (decod) ', [im_label_map.get(label) for label in label_adv[0:10].tolist()])
+        print('top 10 prob muestra pertb (%)', [round(num * 100, 2) for num in prob_adv[0:10].tolist()])
+        print('pos orig en perturbado  ', pertub_pos_list)
+        print('top 10 recuperados    ', label_masked[0:10].tolist())
+        print('top 10 recuperados (decod) ', [im_label_map.get(label) for label in label_masked[0:10].tolist()])
+        print('top 10 prob muestra recup (%)', [round(num * 100, 2) for num in prob_masked[0:10].tolist()])
+        print('pos orig en recuperado  ', recov_pos_list)
         print('')
 
-print(torch.stack(top_cnt_full).sum(0)/val_loader.batch_size)
+
+recov_table = torch.stack(recov_top_cnt_full)
+recov_stats = recov_table.sum(0) / (val_loader.batch_size * len(val_loader))
+
+pertb_table = torch.stack(pertb_top_cnt_full)
+pertb_stats = pertb_table.sum(0) / (val_loader.batch_size * len(val_loader))
+
+print('estado despues de perturbar')
+print(pertb_stats)
+print('')
+
+print('estado despues de recuperar')
+print(recov_stats)
+print('')
+
+pr = torch.stack(pertb_radio).float()
+print('radio perturbacion')
+print(pr)
+print('promedio')
+print(pr.mean(0))
+print('')
+
+rr = torch.stack(recov_radio).float()
+print('radio recuperacion')
+print(rr)
+print('promedio')
+print(rr.mean(0))
+print('')
 print('Time taken: {:.3f}'.format(time.time() - init_time))

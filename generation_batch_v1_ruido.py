@@ -19,8 +19,11 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.colors import ListedColormap
 from tqdm import tqdm, trange
 import skimage
+from skimage.transform import resize
 
 # Fixing for deterministic results
 torch.backends.cudnn.deterministic = True
@@ -34,19 +37,19 @@ from model.networks import Generator
 imagenet_val_xml_path = './val_bb'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
-input_dir_path = 'images_list.txt'
+input_dir_path = 'images_list2.txt'
 text_file = abs_path(input_dir_path)
 imagenet_class_mappings = './imagenet_class_mappings'
 
 torch.manual_seed(0)
 learning_rate = 0.1
 max_iterations = 301
-l1_coeff = 1e-3/10  #1e-3 #1e-6 #2*1e-7
+l1_coeff = 1e-3/10  # 1e-3/3  # 1e-3/10  # 1e-6 # 2*1e-7
 size = 224
 
 tv_beta = 3
 tv_coeff = 1e-2
-factorTV = 0.1 #0.1   # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
+factorTV = 1  # 0.1   # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
 
 def tv_norm(input, tv_beta):
@@ -77,8 +80,8 @@ def imagenet_label_mappings():
                                for x in f.readlines() if len(x.strip()) > 0}
         return image_label_mapping
 
-im_label_map = imagenet_label_mappings()
 
+im_label_map = imagenet_label_mappings()
 
 transform_val = transforms.Compose([
     transforms.Resize((256, 256)),
@@ -104,9 +107,18 @@ def tensor_imshow(inp, title=None, **kwargs):
     plt.show()
 
 
+# Creating colormap
+uP = cm.get_cmap('Blues_r', 129)
+dowN = cm.get_cmap('Blues_r', 128)
+newcolors = np.vstack((
+    dowN(np.linspace(0, 1, 128)),
+    uP(np.linspace(0, 1, 129))
+))
+cMap = ListedColormap(newcolors, name='RedsBlues')
+cMap.colors[257 // 2, :] = [1, 1, 1, 1]
+
 
 def my_explanation(img_batch, max_iterations, gt_category):
-
     np.random.seed(seed=0)
     mask = torch.from_numpy(np.random.uniform(0.99, 1, size=(1, 1, 224, 224)))
     mask = mask.expand(img_batch.size(0), 1, 224, 224)
@@ -125,18 +137,43 @@ def my_explanation(img_batch, max_iterations, gt_category):
 
         preds = outputs[torch.arange(0, img_batch.size(0)).tolist(), gt_category.tolist()]
 
-        loss = l1_coeff * torch.sum(torch.abs(mask), dim=(1, 2, 3)) - (preds) + factorTV * tv_coeff * tv_norm(mask, tv_beta)
+        loss = l1_coeff * torch.sum(torch.abs(mask), dim=(1, 2, 3)) - (preds) + factorTV * tv_coeff * tv_norm(mask,
+                                                                                                              tv_beta)
         loss.backward(gradient=torch.ones_like(loss).cuda())
         # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         optimizer.step()
         mask.data.clamp_(0, 1)
 
+    mask_np = (mask.cpu().detach().numpy())
 
-    # mask_np = (mask.cpu().detach().numpy())
-    #
-    # for i in range(mask_np.shape[0]):
-    #     plt.imshow(mask_np[i, 0, :, :])
-    #     plt.show()
+    for i in range(mask_np.shape[0]):
+        # plt.imshow(mask_np[i, 0, :, :], interpolation='none', cmap=cMap)
+        # plt.axis('off')
+        # plt.show()
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 3, 1)
+        inp = img_batch[i].cpu().numpy().transpose((1, 2, 0))
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        inp = std * inp + mean
+        inp = np.clip(inp, 0, 1)
+        ax.imshow(inp)
+        # title = file_names[i].split('/')[-1].split('.JPEG')[0]
+        # ax.set_title(title)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax = fig.add_subplot(1, 3, 2)
+        mask_rz = mask_np[i, 0, :, :]
+        ax.imshow(mask_rz, cmap=cMap)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax = fig.add_subplot(1, 3, 3)
+        img_masked = np.multiply(inp, np.repeat(np.expand_dims(mask_rz, axis=2), 3, axis=2))
+        ax.imshow(img_masked)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        fig.tight_layout()
+        plt.show()
 
     return mask
 
@@ -199,10 +236,9 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 200], noise_var=2.0)
-val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=25, shuffle=False, num_workers=10,
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 7], noise_var=1.0)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=7, shuffle=False, num_workers=10,
                                          pin_memory=True)
-
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
@@ -221,10 +257,10 @@ for i, (imgs_orig, imgs_noise, targets, file_names) in iterator:
     probs_orig, labels_orig = torch.topk(preds_orig, 10)  # Top 10 predicciones originales
 
     preds_noise = torch.nn.Softmax(dim=1)(model(imgs_noise))  # tensor(n_batch,1000)
-    probs_noise, labels_noise = torch.topk(preds_noise, 1000)  # Top 1 predicciones ruido
+    probs_noise, labels_noise = torch.topk(preds_noise, 1000)  # Top 1000 predicciones ruido
 
     # obtención de explicaciones para imágenes con ruido
-    _, orig_labels = torch.max(preds_orig, 1)  # labels originales para generar las explicaciones
+    _, orig_labels = torch.max(preds_orig, 1)  # labels originales para generar las explicaciones, top 1
     mask = my_explanation(imgs_noise, max_iterations, orig_labels)
 
     # reenmascaramiento de img ruidosa con explicación
@@ -243,6 +279,8 @@ for i, (imgs_orig, imgs_noise, targets, file_names) in iterator:
         label_masked = labels_masked.cpu().detach()[i]  # (1000,)
         label_noise = labels_noise.cpu().detach()[i]
 
+        prob_noise = probs_noise.cpu().detach()[i]
+
         # se buscan donde estan las etiquetas originales dentro de las perturbadas
         pertub_pos_list = [torch.where(label_noise == label_orig_item)[0].item() for label_orig_item in label_orig]
         pertub_pos_list_tensor = torch.tensor(pertub_pos_list)
@@ -260,26 +298,30 @@ for i, (imgs_orig, imgs_noise, targets, file_names) in iterator:
         recov_top_cnt = [torch.where(recov_pos_list_tensor <= i)[0].nelement() >= 1 for i in range(10)]
         recov_top_cnt_full.append(torch.tensor(recov_top_cnt))
 
-        print('orig label, muestra', i, ': ', label_orig.tolist())
-        print('pos orig en recuperado  ', recov_pos_list)
+        print('muestra ', file_names[i].split('/')[-1].split('.JPEG')[0])
+        print('top 10 muestra original: ', label_orig.tolist())
+        print('top 10 muestra original (decod): ', [im_label_map.get(label) for label in label_orig.tolist()])
+        print('top 10 prob muestra original (%): ', [round(num*100, 2) for num in prob_orig.tolist()])
         print('lista top 10 recuperados acum ', recov_top_cnt)
-        print('lista de recuperados    ', label_masked[0:10].tolist())
-        print('lista de perturbados    ', label_noise[0:10].tolist())
+        print('top 10 perturbados    ', label_noise[0:10].tolist())
+        print('top 10 perturbados (decod) ', [im_label_map.get(label) for label in label_noise[0:10].tolist()])
+        print('top 10 prob muestra pertb (%)', [round(num*100, 2) for num in prob_noise[0:10].tolist()])
         print('pos orig en perturbado  ', pertub_pos_list)
-
+        print('top 10 recuperados    ', label_masked[0:10].tolist())
+        print('top 10 recuperados (decod) ', [im_label_map.get(label) for label in label_masked[0:10].tolist()])
+        print('top 10 prob muestra recup (%)', [round(num*100, 2) for num in prob_masked[0:10].tolist()])
+        print('pos orig en recuperado  ', recov_pos_list)
         print('')
 
-
 recov_table = torch.stack(recov_top_cnt_full)
-recov_stats = recov_table.sum(0)/(val_loader.batch_size*len(val_loader))
+recov_stats = recov_table.sum(0) / (val_loader.batch_size * len(val_loader))
 
 pertb_table = torch.stack(pertb_top_cnt_full)
-pertb_stats = pertb_table.sum(0)/(val_loader.batch_size*len(val_loader))
+pertb_stats = pertb_table.sum(0) / (val_loader.batch_size * len(val_loader))
 
 print('estado despues de perturbar')
 print(pertb_stats)
 print('')
-
 
 print('estado despues de recuperar')
 print(recov_stats)
