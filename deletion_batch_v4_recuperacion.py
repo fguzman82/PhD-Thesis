@@ -352,6 +352,7 @@ class DataProcessing:
         self.if_noise = if_noise
         self.noise_mean = 0
         self.noise_var = noise_var
+        self.img_idxs = img_idxs
 
         img_list = img_name_list[img_idxs[0]:img_idxs[1]]
         self.img_filenames = [os.path.join(data_path, f'{i}.JPEG') for i in img_list]
@@ -360,7 +361,7 @@ class DataProcessing:
     def __getitem__(self, index):
         img = Image.open(os.path.join(self.data_path, self.img_filenames[index])).convert('RGB')
         target = self.get_image_class(os.path.join(self.data_path, self.img_filenames[index]))
-        img_adv = adv_batch[index]
+        img_adv = adv_batch[index + self.img_idxs[0]]
         if self.if_noise == 1:
             img = skimage.util.random_noise(np.asarray(img), mode='gaussian',
                                             mean=self.noise_mean, var=self.noise_var,
@@ -396,7 +397,7 @@ transform_val = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 25], if_noise=0, noise_var=0.0)
+val_dataset = DataProcessing(base_img_dir, transform_val, img_idxs=[0, 200], if_noise=0, noise_var=0.0)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=25, shuffle=False, num_workers=10,
                                          pin_memory=True)
 

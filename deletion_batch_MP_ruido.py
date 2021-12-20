@@ -58,7 +58,7 @@ def tv_norm(input, tv_beta):
     return row_grad + col_grad
 
 
-torch.cuda.set_device(1)  # especificar cual gpu 0 o 1
+torch.cuda.set_device(0)  # especificar cual gpu 0 o 1
 model = models.googlenet(pretrained=True)
 # model = models.resnet50(pretrained=True)
 # model = models.vgg16(pretrained=True)

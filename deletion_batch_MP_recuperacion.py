@@ -170,7 +170,7 @@ def my_explanation(img_batch, max_iterations, gt_category, file_names):
         ax.set_xticks([])
         ax.set_yticks([])
         # fig.tight_layout()
-        # plt.show()
+        plt.show()
 
     return mask
 
