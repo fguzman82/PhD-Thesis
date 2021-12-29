@@ -117,8 +117,8 @@ mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, s
 torch.cuda.set_device(0)
 # model = models.googlenet(pretrained=True)
 # model = models.resnet50(pretrained=True)
-# model = models.vgg16(pretrained=True)
-model = models.alexnet(pretrained=True)
+model = models.vgg16(pretrained=True)
+# model = models.alexnet(pretrained=True)
 model = torch.nn.DataParallel(model, device_ids=[0,1])
 model.cuda()
 model.eval()
@@ -153,9 +153,10 @@ def auc2(arr):
 # df['googlenet_LIME']=''
 
 df = pd.read_pickle('auc_scores.pkl')
-df['vgg16_SHAP'] = ''
+df['alexnet_SHAP'] = ''
 
 for i, (images, masks, targets, file_names) in iterator:
+    masks = masks / masks.max()
     scores = deletion.evaluate(images, masks.numpy(), batch_size)
     print(auc2(scores).mean())
     auc_acum[i] = auc(scores.mean(1))
@@ -164,7 +165,7 @@ for i, (images, masks, targets, file_names) in iterator:
     for idx, file_name in enumerate(file_names):
         # df.file[idx] = file_name.split('/')[-1].split('.JPEG')[0]
         # df.target[idx] = targets[idx].numpy()
-        df.vgg16_SHAP[idx] = aucs[idx]
+        df.alexnet_SHAP[idx] = aucs[idx]
 
     # pred = torch.nn.Softmax(dim=1)(model(images.cuda()))
     # for j, img in enumerate(images):

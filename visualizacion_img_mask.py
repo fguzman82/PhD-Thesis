@@ -20,17 +20,27 @@ import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+from matplotlib.colors import LinearSegmentedColormap
 
 # bibliotecas RISE
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path = './output_v2'
+results_path = './vgg16_SHAP'
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
 imagenet_class_mappings = './imagenet_class_mappings'
 input_dir_path = 'images_list.txt'
 text_file = abs_path(input_dir_path)
+
+colors = []
+for l in np.linspace(1, 0, 100):
+    colors.append((30. / 255, 136. / 255, 229. / 255, l))
+for l in np.linspace(0, 1, 100):
+    colors.append((9. / 255, 97. / 255, 3. / 255, l))
+ # for l in np.linspace(0, 1, 100):
+ #        colors.append((30./255, 136./255, 229./255,l))
+red_transparent_blue = LinearSegmentedColormap.from_list("red_transparent_blue", colors)
 
 mask_filenames = os.listdir(results_path)
 mask_list = [i.split('_mask')[0] for i in mask_filenames]
@@ -99,11 +109,12 @@ def tensor_imshow(inp, title=None, **kwargs):
     std = np.array([0.229, 0.224, 0.225])
     inp = std * inp + mean
     inp = np.clip(inp, 0, 1)
-    plt.imshow(inp, **kwargs)
+    inp = (0.2989 * inp[:, :, 0] + 0.5870 * inp[:, :, 1] + 0.1140 * inp[:, :, 2])  # rgb to gray
+    plt.imshow(inp, cmap=plt.get_cmap('gray'), alpha=0.15, **kwargs)
     if title is not None:
         plt.title(title)
     plt.axis('off')
-    plt.show()
+    #plt.show()
 
 
 transform_val = transforms.Compose([
@@ -148,6 +159,9 @@ for i, (images, mask, target) in iterator:
         # title = 'target={}'.format(im_label_map.get(target_img))
         tensor_imshow(img, title=title)
         mask_np = mask[j].numpy()
-        plt.imshow(mask_np)
+        abs_vals = np.stack([np.abs(mask_np[i]) for i in range(len(mask_np))], 0).flatten()
+        max_val = np.nanpercentile(abs_vals, 99.9)
+        print(max_val)
+        plt.imshow(mask_np, cmap=red_transparent_blue, vmin=-max_val, vmax=max_val)
         plt.axis('off')
         plt.show()

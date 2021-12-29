@@ -117,7 +117,16 @@ val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=50, shuffle=Fal
 # especificar cual gpu 0 o 1
 torch.cuda.set_device(1)
 # load the model
-model = models.vgg16(pretrained=True)
+modelo = 'alexnet'
+# load the model
+if modelo == 'googlenet':
+    model = models.googlenet(pretrained=True)
+elif modelo == 'vgg16':
+    model = models.vgg16(pretrained=True)
+elif modelo == 'resnet50':
+    model = models.resnet50(pretrained=True)
+elif modelo == 'alexnet':
+    model = models.alexnet(pretrained=True)
 model.cuda()
 model.eval()
 
@@ -125,11 +134,19 @@ im_label_map = imagenet_label_mappings()
 
 iterator = tqdm(enumerate(val_loader), total=len(val_loader), desc='batch')
 
-save_path = './vgg16_SHAP'
+save_path = './{}_SHAP'.format(modelo)
 
 for i, (images, target, path) in iterator:
     images = images.cuda()
-    e = shap.GradientExplainer((model, model.features[7]), images)
+    if modelo == 'googlenet':
+        e = shap.GradientExplainer((model, model.conv2), images)
+    elif modelo == 'resnet50':
+        e = shap.GradientExplainer((model, model.layer1[0].conv1), images)
+    elif modelo == 'vgg16':
+        e = shap.GradientExplainer((model, model.features[7]), images)
+    elif modelo == 'alexnet':
+        e = shap.GradientExplainer((model, model.features[3]), images)
+
     shap_values, indexes = e.shap_values(images, ranked_outputs=1, nsamples=200)
 
     heatmap = np.clip(shap_values[0].sum(1), 0, 1)
