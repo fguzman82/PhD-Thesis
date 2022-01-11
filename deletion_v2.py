@@ -60,16 +60,16 @@ if __name__ == '__main__':
 
     # img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
-    # img_path = 'example.JPEG'
-    img_path = 'example_2.JPEG'
+    img_path = 'example.JPEG'
+    # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
     save_path = './output/'
 
-    # gt_category = 207  # Golden retriever
+    gt_category = 207  # Golden retriever
     # gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
-    gt_category = 565  # freight car
+    # gt_category = 565  # freight car
     # gt_category = 1  # goldfish, Carassius auratus
 
     try:
@@ -85,39 +85,92 @@ if __name__ == '__main__':
     l1_coeff = 0.01e-5  # 1e-4 (preservation)
     size = 224
 
-    # model = models.vgg16(pretrained=True)
-    # model = models.resnet50(pretrained=True)
-    model = models.googlenet(pretrained=True)
-    model.to('cuda')
-    # evaluar el modelo para que sea deterministico
+    modelo = 'googlenet'
+    # load the model
+    if modelo == 'googlenet':
+        model = models.googlenet(pretrained=True)
+    elif modelo == 'vgg16':
+        model = models.vgg16(pretrained=True)
+    elif modelo == 'resnet50':
+        model = models.resnet50(pretrained=True)
+    elif modelo == 'alexnet':
+        model = models.alexnet(pretrained=True)
+    else:
+        model = models.googlenet(pretrained=True)
+
+    model.cuda()
     model.eval()
 
-    list_of_layers = ['conv1',
-                      'conv2',
-                      'conv3',
-                      'inception3a',
-                      'inception3b',
-                      'inception4a',
-                      'inception4b',
-                      'inception4c',
-                      'inception4d',
-                      'inception4e',
-                      'inception5a',
-                      'inception5b',
-                      #'fc'
-                      ]
+    if modelo == 'googlenet':
+        list_of_layers = ['conv1',
+                          'conv2',
+                          'conv3',
+                          'inception3a',
+                          'inception3b',
+                          'inception4a',
+                          'inception4b',
+                          'inception4c',
+                          'inception4d',
+                          'inception4e',
+                          'inception5a',
+                          'inception5b',
+                          #'fc'
+                          ]
+
+    elif modelo == 'resnet50':
+        list_of_layers = ['relu',
+                          'layer1.0',
+                          'layer1.1',
+                          'layer1.2',
+                          'layer2.0',
+                          'layer2.1',
+                          'layer2.2',
+                          'layer2.3',
+                          'layer3.0',
+                          'layer3.1',
+                          'layer3.2',
+                          'layer3.3',
+                          'layer3.4',
+                          'layer3.5',
+                          'layer4.0',
+                          'layer4.1',
+                          'layer4.2',
+                          ]
+
+    elif modelo == 'vgg16':
+        list_of_layers = ['features.1',
+                          'features.3',
+                          'features.6',
+                          'features.8',
+                          'features.11',
+                          'features.13',
+                          'features.15',
+                          'features.18',
+                          'features.20',
+                          'features.22',
+                          'features.25',
+                          'features.27',
+                          'features.29'
+                          ]
+
+    elif modelo == 'alexnet':
+        list_of_layers = ['features.1',
+                          'features.4',
+                          'features.7',
+                          'features.9',
+                          'features.11',
+                          'classifier.2',
+                          'classifier.5'
+                          ]
+    else:
+        list_of_layers = [ ]
+
 
     label_map = load_imagenet_label_map()
-    # model = torch.nn.DataParallel(model).to('cuda')
-    # model = model.to('cuda')
 
     activation_orig = {}
-    gradients_orig = {}
+    # gradients_orig = {}
 
-
-    # no se necesitan gradientes para los parametros
-    # for param in model.parameters():
-    #    param.requires_grad = False
 
     def get_activation_orig(name):
         def hook(model, input, output):
@@ -126,26 +179,31 @@ if __name__ == '__main__':
         return hook
 
 
-    def get_gradients_orig(name):
-        def hook(model, grad_input, grad_output):
-            gradients_orig[name] = grad_output[0].cpu().detach().numpy()
-
-        return hook
+    # def get_gradients_orig(name):
+    #     def hook(model, grad_input, grad_output):
+    #         gradients_orig[name] = grad_output[0].cpu().detach().numpy()
+    #
+    #     return hook
 
 
     F_hook = []
-    B_hook = []
+    # B_hook = []
+    exp_hook = []
 
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
-            B_hook.append(layer.register_backward_hook(get_gradients_orig(name)))
+    if modelo == 'googlenet':
+        for name, layer in model.named_children():
+            if name in list_of_layers:
+                F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
+                # B_hook.append(layer.register_backward_hook(get_gradients_orig(name)))
+    else:
+        for module_name, module in model.named_modules():
+            if module_name in list_of_layers:
+                F_hook.append(module.register_forward_hook(get_activation_orig(module_name)))
+
 
     init_time = time.time()
 
     # Leer la imágen del archivo
-    # original_img = cv2.imread(img_path, 1)
-    # img = np.float32(original_img) / 255
     original_img_pil = Image.open(img_path).convert('RGB')
     # original_np = np.array(original_img_pil)
 
@@ -187,18 +245,13 @@ if __name__ == '__main__':
     print('probabilidad original para ', cat_orig, '=', prob_orig)
 
 
-    # CALCULO ITERATIVO DE LA MASCARA
-    #model = models.googlenet(pretrained=True)
-    #model.to(device)
-    #model.eval()
-
     for fh in F_hook:
         fh.remove()
 
-    for bh in B_hook:
-        bh.remove()
+    # for bh in B_hook:
+    #     bh.remove()
 
-    gradients = {}
+    # gradients = {}
 
 
     def get_activation_mask(name):
@@ -220,19 +273,23 @@ if __name__ == '__main__':
         return hook
 
 
-    def get_act_mask_gradients(name):
-        def hook(model, grad_input, grad_output):
-            gradients[name] = grad_output[0]
-            # print('backward')
-            # return (new_grad,)
+    # def get_act_mask_gradients(name):
+    #     def hook(model, grad_input, grad_output):
+    #         gradients[name] = grad_output[0]
+    #         # print('backward')
+    #         # return (new_grad,)
+    #
+    #     return hook
 
-        return hook
-
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            layer.register_forward_hook(get_activation_mask(name))
-            layer.register_backward_hook(get_act_mask_gradients(name))
+    if modelo == 'googlenet':
+        for name, layer in model.named_children():
+            if name in list_of_layers:
+                exp_hook.append(layer.register_forward_hook(get_activation_mask(name)))
+                # layer.register_backward_hook(get_act_mask_gradients(name))
+    else:
+        for module_name, module in model.named_modules():
+            if module_name in list_of_layers:
+                exp_hook.append(module.register_forward_hook(get_activation_mask(module_name)))
 
     for param in model.parameters():
         param.requires_grad = False
@@ -346,27 +403,45 @@ if __name__ == '__main__':
 
             Image.fromarray(img_pert_unnorma).save(path_intermediate, 'JPEG')
 
+    for eh in exp_hook:
+        eh.remove()
+
     # np.save(os.path.abspath(os.path.join(save_path, "mask_MP.npy")),
     #        1 - mask.cpu().detach().numpy()[0, 0, :])
 
     # up_mask_np = upsampled_mask.cpu().detach().numpy()
     # plt.imshow(up_mask_np[0, 0, :])
     # plt.show()
-    print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
+    masked_pred = outputs[0, gt_category].cpu().detach().numpy()
+    print('prediccion:', masked_pred)
 
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
-    plt.imshow(1 - mask_np)  # 1-mask para deletion
-    plt.axis('off')
-    plt.show()
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
 
     original_img_pil = Image.open(img_path).convert('RGB')
-    img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
+    img_normal = transform(original_img_pil)  # Tensor
 
+    inp = img_normal.numpy().transpose((1, 2, 0))
+    # Mean and std for ImageNet
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    plt.imshow(inp, interpolation='none')
+    plt.text(5, 204, 'orig prob', color='black', fontsize=7,
+            bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
+                      ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
+    plt.text(5, 217, str(np.round(prob_orig * 100, 1)) + '%', color='black',
+            bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
+                      ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
+    plt.axis('off')
+    plt.show()
+
+    img_normal = img_normal.unsqueeze(0)
     mask_tensor = numpy_to_torch2(1 - mask_np)  # tensor (1, 1, 224, 224)
     mask_expanded = mask_tensor.expand(1, 3, mask.size(2), mask.size(3))  # tensor (1, 3, 224, 224)
     null_img = torch.zeros(1, 3, size, size)
@@ -398,6 +473,18 @@ if __name__ == '__main__':
 
     deletion = CausalMetric(model, 'del', 224, substrate_fn=torch.zeros_like)
     h = deletion.single_run(img_normal, (1. - mask_np), verbose=1)
-    print('deletion score: ', auc(h))
+    del_score = auc(h)
+    print('deletion score: ', del_score)
+
+    plt.imshow(1 - mask_np)
+    plt.text(185, 215, np.round(del_score, 3), color='black', fontsize=10,
+            bbox=dict(facecolor='white', alpha=1, ec='white'))
+    plt.text(185, 203, 'del score', color='white', fontsize=8)
+    plt.text(5, 215, str(np.round(masked_pred * 100, 3)) + '%', fontsize=10, bbox=dict(boxstyle='round',
+                                                                                      ec=(0., 0., 153/255),
+                                                                                      fc=(153/255, 221/255, 255/255),
+                                                                                      alpha=0.8))
+    plt.axis('off')
+    plt.show()
 
 

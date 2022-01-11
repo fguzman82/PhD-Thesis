@@ -17,7 +17,11 @@ import matplotlib.pyplot as plt
 from skimage.transform import resize
 from torchvision import models
 
-#sys.path.insert(0, './generativeimptorch')
+#bibliotecas RISE
+sys.path.insert(0, './RISE')
+from evaluation import CausalMetric, auc, gkern
+
+# sys.path.insert(0, './generativeimptorch')
 
 use_cuda = torch.cuda.is_available()
 

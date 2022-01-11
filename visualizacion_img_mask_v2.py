@@ -27,11 +27,11 @@ from matplotlib.colors import LinearSegmentedColormap
 sys.path.insert(0, './RISE')
 from evaluation import CausalMetric, auc, gkern
 
-results_path_SP = './vgg16_SHAP'
-results_path_LIME = './vgg16_LIME'
-results_path_RISE = './vgg16_RISE'
-results_path_MP = './vgg16_MP'
-results_path_v4 = './vgg16_v4_tv'
+results_path_SP = './resnet50_SHAP'
+results_path_LIME = './resnet50_LIME'
+results_path_RISE = './resnet50_RISE'
+results_path_MP = './resnet50_MP'
+results_path_v4 = './resnet50_v2'
 
 imagenet_val_path = './val/'
 base_img_dir = abs_path(imagenet_val_path)
@@ -143,8 +143,8 @@ mask_loader = torch.utils.data.DataLoader(mask_dataset, batch_size=batch_size, s
 
 torch.cuda.set_device(0)
 # model = models.googlenet(pretrained=True)
-# model = models.resnet50(pretrained=True)
-model = models.vgg16(pretrained=True)
+model = models.resnet50(pretrained=True)
+# model = models.vgg16(pretrained=True)
 # model = models.alexnet(pretrained=True)
 # model = torch.nn.DataParallel(model, device_ids=[0, 1])
 model.cuda()
