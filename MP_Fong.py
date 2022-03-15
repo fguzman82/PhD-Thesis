@@ -52,7 +52,7 @@ if __name__ == '__main__':
     # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
-    # img_path = './dataset/0.JPEG'
+    img_path = './dataset/0.JPEG'
     save_path = './output/'
 
     #gt_category = 207  # Golden retriever

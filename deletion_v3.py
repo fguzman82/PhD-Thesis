@@ -89,41 +89,90 @@ if __name__ == '__main__':
     tv_coeff = 1e-2
     factorTV = 0*0.005  # 1(dense) o 0.5 (sparser/sharp)   #0.5 (preservation)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    modelo = 'googlenet'
+    # load the model
+    if modelo == 'googlenet':
+        model = models.googlenet(pretrained=True)
+    elif modelo == 'vgg16':
+        model = models.vgg16(pretrained=True)
+    elif modelo == 'resnet50':
+        model = models.resnet50(pretrained=True)
+    elif modelo == 'alexnet':
+        model = models.alexnet(pretrained=True)
+    else:
+        model = models.googlenet(pretrained=True)
 
-    # model = models.vgg16(pretrained=True)
-    # model = models.resnet50(pretrained=True)
-    model = models.googlenet(pretrained=True)
-    model.to(device)
-    # evaluar el modelo para que sea deterministico
+    model.cuda()
     model.eval()
 
-    list_of_layers = ['conv1',
-                      'conv2',
-                      'conv3',
-                      'inception3a',
-                      'inception3b',
-                      'inception4a',
-                      'inception4b',
-                      'inception4c',
-                      'inception4d',
-                      'inception4e',
-                      'inception5a',
-                      'inception5b',
-                      # 'fc'
-                      ]
+    if modelo == 'googlenet':
+        list_of_layers = ['conv1',
+                          'conv2',
+                          'conv3',
+                          'inception3a',
+                          'inception3b',
+                          'inception4a',
+                          'inception4b',
+                          'inception4c',
+                          'inception4d',
+                          'inception4e',
+                          'inception5a',
+                          'inception5b',
+                          'fc'
+                          ]
+
+    elif modelo == 'resnet50':
+        list_of_layers = ['relu',
+                          'layer1.0',
+                          'layer1.1',
+                          'layer1.2',
+                          'layer2.0',
+                          'layer2.1',
+                          'layer2.2',
+                          'layer2.3',
+                          'layer3.0',
+                          'layer3.1',
+                          'layer3.2',
+                          'layer3.3',
+                          'layer3.4',
+                          'layer3.5',
+                          'layer4.0',
+                          'layer4.1',
+                          'layer4.2',
+                          ]
+
+    elif modelo == 'vgg16':
+        list_of_layers = ['features.1',
+                          'features.3',
+                          'features.6',
+                          'features.8',
+                          'features.11',
+                          'features.13',
+                          'features.15',
+                          'features.18',
+                          'features.20',
+                          'features.22',
+                          'features.25',
+                          'features.27',
+                          'features.29'
+                          ]
+
+    elif modelo == 'alexnet':
+        list_of_layers = ['features.1',
+                          'features.4',
+                          'features.7',
+                          'features.9',
+                          'features.11',
+                          'classifier.2',
+                          'classifier.5'
+                          ]
+    else:
+        list_of_layers = []
 
     label_map = load_imagenet_label_map()
-    # model = torch.nn.DataParallel(model).to('cuda')
-    # model = model.to('cuda')
 
     activation_orig = {}
-    gradients_orig = {}
-
-
-    # no se necesitan gradientes para los parametros
-    # for param in model.parameters():
-    #    param.requires_grad = False
+    # gradients_orig = {}
 
     def get_activation_orig(name):
         def hook(model, input, output):
@@ -132,17 +181,25 @@ if __name__ == '__main__':
         return hook
 
 
-    def get_gradients_orig(name):
-        def hook(model, grad_input, grad_output):
-            gradients_orig[name] = grad_output[0].cpu().detach().numpy()
+    # def get_gradients_orig(name):
+    #     def hook(model, grad_input, grad_output):
+    #         gradients_orig[name] = grad_output[0].cpu().detach().numpy()
+    #
+    #     return hook
 
-        return hook
+    F_hook = []
+    # B_hook = []
+    exp_hook = []
 
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            F_hook = layer.register_forward_hook(get_activation_orig(name))
-            B_hook = layer.register_backward_hook(get_gradients_orig(name))
+    if modelo == 'googlenet':
+        for name, layer in model.named_children():
+            if name in list_of_layers:
+                F_hook.append(layer.register_forward_hook(get_activation_orig(name)))
+                # B_hook.append(layer.register_backward_hook(get_gradients_orig(name)))
+    else:
+        for module_name, module in model.named_modules():
+            if module_name in list_of_layers:
+                F_hook.append(module.register_forward_hook(get_activation_orig(module_name)))
 
     init_time = time.time()
 
@@ -165,13 +222,13 @@ if __name__ == '__main__':
     # se normaliza la imágen y se agrega una dimensión [1,3,244,244]
     img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
     img_normal.requires_grad = False
-    img_normal = img_normal.to(device)
+    img_normal = img_normal.cuda()
 
     cat_orig = label_map[gt_category]
     print('explicacion para: ', cat_orig)
 
     # Path to the output folder
-    save_path = os.path.join(save_path, 'MP', 'imagenet')
+    save_path = os.path.join(save_path, 'V3', 'imagenet')
     mkdir_p(os.path.join(save_path))
 
     # Compute original output
@@ -189,16 +246,13 @@ if __name__ == '__main__':
 
     print('probabilidad original para ', cat_orig, '=', prob_orig)
 
-    F_hook.remove()
-    B_hook.remove()
-    del model
+    for fh in F_hook:
+        fh.remove()
 
-    # CALCULO ITERATIVO DE LA MASCARA
-    model = models.googlenet(pretrained=True)
-    model.to(device)
-    model.eval()
+    # for bh in B_hook:
+    #     bh.remove()
 
-    gradients = {}
+    # gradients = {}
 
 
     def get_activation_mask(name):
@@ -220,19 +274,23 @@ if __name__ == '__main__':
         return hook
 
 
-    def get_act_mask_gradients(name):
-        def hook(model, grad_input, grad_output):
-            gradients[name] = grad_output[0]
-            # print('backward')
-            # return (new_grad,)
+    # def get_act_mask_gradients(name):
+    #     def hook(model, grad_input, grad_output):
+    #         gradients[name] = grad_output[0]
+    #         # print('backward')
+    #         # return (new_grad,)
+    #
+    #     return hook
 
-        return hook
-
-
-    for name, layer in model.named_children():
-        if name in list_of_layers:
-            layer.register_forward_hook(get_activation_mask(name))
-            layer.register_backward_hook(get_act_mask_gradients(name))
+    if modelo == 'googlenet':
+        for name, layer in model.named_children():
+            if name in list_of_layers:
+                exp_hook.append(layer.register_forward_hook(get_activation_mask(name)))
+                # layer.register_backward_hook(get_act_mask_gradients(name))
+    else:
+        for module_name, module in model.named_modules():
+            if module_name in list_of_layers:
+                exp_hook.append(module.register_forward_hook(get_activation_mask(module_name)))
 
     for param in model.parameters():
         param.requires_grad = True
@@ -250,16 +308,10 @@ if __name__ == '__main__':
     #orig_img_tensor = transform(original_img_pil).unsqueeze(0)
     #null_img_blur = transforms.GaussianBlur(kernel_size=223, sigma=10)(orig_img_tensor)
     null_img_blur.requires_grad = False
-    null_img = null_img_blur.to(device)
+    null_img = null_img_blur.cuda()
 
     # Definición del tipo de optimizador
     optimizer = torch.optim.Adam([mask], lr=learning_rate)
-    # optimizer = torch.optim.SGD([mask], lr=learning_rate, momentum = 0.9)
-    # momentum = 0.9
-    # optimizer = torch.optim.SGD([mask],
-    #                       lr=learning_rate,
-    #                       momentum=momentum,
-    #                       dampening=momentum)
 
     for i in range(max_iterations):
         # upsampled_mask = upsample(mask)
@@ -274,7 +326,7 @@ if __name__ == '__main__':
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # tensor (1, 1000)
 
-        similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
+        # similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
 
         # + tv_coeff * tv_norm(mask, tv_beta)
         # loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity + factorTV * tv_coeff * tv_norm(mask,
@@ -290,7 +342,7 @@ if __name__ == '__main__':
         # print('min mask(grad)=', mask_grads.min())
         # torch.nn.utils.clip_grad_norm_(mask, 1, norm_type=float('inf'))
 
-        mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
+        # mask.grad.data = torch.nn.functional.normalize(mask.grad.data, p=float('inf'), dim=(2, 3))
         # torch.nn.utils.clip_grad_norm_(mask, 1)
 
         # mask_grads = np.squeeze(mask.grad.data.cpu().numpy())
@@ -359,27 +411,51 @@ if __name__ == '__main__':
 
             Image.fromarray(img_pert_unnorma).save(path_intermediate, 'JPEG')
 
+    for eh in exp_hook:
+        eh.remove()
+
     # np.save(os.path.abspath(os.path.join(save_path, "mask_MP.npy")),
     #        1 - mask.cpu().detach().numpy()[0, 0, :])
 
     # up_mask_np = upsampled_mask.cpu().detach().numpy()
     # plt.imshow(up_mask_np[0, 0, :])
     # plt.show()
-    print('prediccion:', outputs[0, gt_category].cpu().detach().numpy())
+    masked_pred = outputs[0, gt_category].cpu().detach().numpy()
+    print('prediccion:', masked_pred)
 
     mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
     # mask_np_T = np.moveaxis(mask_np.transpose(), 0, 1)
     print('max mask=', mask_np.max())
     print('min mask=', mask_np.min())
-    plt.imshow(1 - mask_np)  # 1-mask para deletion
-    plt.axis('off')
-    plt.show()
 
     print('Time taken: {:.3f}'.format(time.time() - init_time))
 
     original_img_pil = Image.open(img_path).convert('RGB')
-    img_normal = transform(original_img_pil).unsqueeze(0)  # Tensor (1, 3, 224, 224)
+    img_normal = transform(original_img_pil)  # Tensor
 
+    inp = img_normal.numpy().transpose((1, 2, 0))
+    # Mean and std for ImageNet
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    plt.imshow(inp, interpolation='none')
+    # plt.text(5, 204, 'orig prob', color='black', fontsize=7,
+    #          bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
+    #                    ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
+    # plt.text(5, 217, str(np.round(prob_orig * 100, 1)) + '%', color='black',
+    #          bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
+    #                    ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
+    plt.text(5, 196, 'orig prob', color='black', fontsize=11,
+             bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
+                       ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
+    plt.text(5, 217, str(np.round(prob_orig * 100, 1)) + '%', color='black', fontsize=17,
+             bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
+                       ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
+    plt.axis('off')
+    plt.show()
+
+    img_normal = img_normal.unsqueeze(0)
     mask_tensor = numpy_to_torch2(1 - mask_np)  # tensor (1, 1, 224, 224)
     mask_expanded = mask_tensor.expand(1, 3, mask.size(2), mask.size(3))  # tensor (1, 3, 224, 224)
     null_img = torch.zeros(1, 3, size, size)
@@ -399,6 +475,38 @@ if __name__ == '__main__':
     # plt.imshow(img_pert_unnorma)
     # plt.show()
 
-    org_softmax = torch.nn.Softmax(dim=1)(model(img_masked.to(device)))
+    org_softmax = torch.nn.Softmax(dim=1)(model(img_masked.cuda()))
     prob_orig = org_softmax.data[0, gt_category].cpu().detach().numpy()
     print('probabilidad de la mascara complemento=', prob_orig)
+
+    klen = 11
+    ksig = 5
+    kern = gkern(klen, ksig)
+    # Function that blurs input image
+    blur = lambda x: torch.nn.functional.conv2d(x, kern, padding=klen // 2)
+
+    deletion = CausalMetric(model, 'del', 224, substrate_fn=torch.zeros_like)
+    h = deletion.single_run(img_normal, (1. - mask_np), verbose=1)
+    del_score = auc(h)
+    print('deletion score: ', del_score)
+
+    plt.imshow(1 - mask_np)
+    # plt.text(185, 215, np.round(del_score, 3), color='black', fontsize=10,
+    #         bbox=dict(facecolor='white', alpha=1, ec='white'))
+    # plt.text(185, 203, 'del score', color='white', fontsize=8)
+    # plt.text(5, 215, str(np.round(masked_pred * 100, 3)) + '%', fontsize=10, bbox=dict(boxstyle='round',
+    #                                                                                   ec=(0., 0., 153/255),
+    #                                                                                   fc=(153/255, 221/255, 255/255),
+    #                                                                                   alpha=0.8))
+    plt.text(175, 215, np.round(del_score, 4), color='black', fontsize=17,
+             bbox=dict(facecolor='white', alpha=1, ec='white'))
+    plt.text(178, 200, 'del score', color='white', fontsize=11)
+    plt.text(5, 215, str(np.round(masked_pred * 100, 3)) + '%', fontsize=17, bbox=dict(boxstyle='round',
+                                                                                       ec=(0., 0., 153 / 255),
+                                                                                       fc=(
+                                                                                       153 / 255, 221 / 255, 255 / 255),
+                                                                                       alpha=0.8))
+
+    plt.colorbar()
+    plt.axis('off')
+    plt.show()

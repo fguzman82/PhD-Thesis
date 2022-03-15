@@ -157,7 +157,8 @@ im_label_map = imagenet_label_mappings()
 thres_vals = np.arange(0.05, 1, 0.05)
 iou_table = np.zeros((len(data_loader)*data_loader.batch_size, 3))
 
-load_path = './output_v4_coco'
+# load_path = './output_SP_coco'
+load_path = './output_SHAP_coco'
 
 iterator = enumerate(tqdm(data_loader, total=len(data_loader), desc='batch'))
 

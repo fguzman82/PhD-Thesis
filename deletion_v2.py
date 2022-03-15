@@ -58,24 +58,24 @@ def numpy_to_torch2(img):
 
 if __name__ == '__main__':
 
-    # img_path = 'perro_gato.jpg'
+    img_path = 'perro_gato.jpg'
     # img_path = 'dog.jpg'
-    img_path = 'example.JPEG'
+    # img_path = 'example.JPEG'
     # img_path = 'example_2.JPEG'
     # img_path = 'goldfish.jpg'
     save_path = './output/'
 
-    gt_category = 207  # Golden retriever
-    # gt_category = 281  # tabby cat
+    # gt_category = 207  # Golden retriever
+    gt_category = 281  # tabby cat
     # gt_category = 258  # "Samoyed, Samoyede"
     # gt_category = 282  # tigger cat
     # gt_category = 565  # freight car
     # gt_category = 1  # goldfish, Carassius auratus
 
-    try:
-        shutil.rmtree(save_path)
-    except OSError as e:
-        print("Error: %s : %s" % (save_path, e.strerror))
+    # try:
+    #     shutil.rmtree(save_path)
+    # except OSError as e:
+    #     print("Error: %s : %s" % (save_path, e.strerror))
 
     # PyTorch random seed
     torch.manual_seed(0)
@@ -114,7 +114,7 @@ if __name__ == '__main__':
                           'inception4e',
                           'inception5a',
                           'inception5b',
-                          #'fc'
+                          # 'fc'
                           ]
 
     elif modelo == 'resnet50':
@@ -225,7 +225,7 @@ if __name__ == '__main__':
     print('explicacion para: ', cat_orig)
 
     # Path to the output folder
-    save_path = os.path.join(save_path, 'MP', 'imagenet')
+    save_path = os.path.join(save_path, 'V2', 'imagenet')
     mkdir_p(os.path.join(save_path))
 
 
@@ -320,7 +320,7 @@ if __name__ == '__main__':
         optimizer.zero_grad()
         outputs = torch.nn.Softmax(dim=1)(model(perturbated_input))  # tensor (1, 1000)
 
-        similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
+        # similarity = -(org_softmax.data[0, gt_category] * torch.log(outputs[0, gt_category]))  # tensor
 
         # + tv_coeff * tv_norm(mask, tv_beta)
         # loss = l1_coeff * torch.sum(torch.abs(mask)) + similarity + factorTV * tv_coeff * tv_norm(mask,
@@ -364,6 +364,8 @@ if __name__ == '__main__':
         # Create save_path for storing intermediate steps
         path = os.path.join(save_path, 'intermediate_steps')
         mkdir_p(path)
+        path2 = os.path.join(save_path, 'mask_steps')
+        mkdir_p(path2)
 
         # DEBUG
         # mask_np = np.squeeze(mask.cpu().detach().numpy())  # array fp32 (224, 224)
@@ -403,6 +405,22 @@ if __name__ == '__main__':
 
             Image.fromarray(img_pert_unnorma).save(path_intermediate, 'JPEG')
 
+            img_pert_np = img.mul(1 - upsampled_mask)[0, :].cpu().detach().numpy()  # array (3, 224, 224)
+            img_pert_np_T = img_pert_np.transpose()  # array (224, 224, 3)
+            img_pert_np_T2 = np.moveaxis(img_pert_np_T, 0, 1)  # array (224, 224, 3) se intercambian cols 0 y  1
+            img_pert_unnorma = np.uint8(255 * unnormalize(img_pert_np_T2))  # array enteros (224, 224, 3)
+
+            path_intermediate = os.path.abspath(os.path.join(path2, 'intermediate_{:05d}_{}_{:.3f}_{}_{:.3f}.jpg'
+                                                             .format(i,
+                                                                     label_map[aind.item()].split(',')[0].split(' ')[
+                                                                         0].split('-')[0],
+                                                                     amax.item(),
+                                                                     label_map[gt_category].split(',')[0].split(' ')[
+                                                                         0].split('-')[0],
+                                                                     gt_val.item())))
+
+            Image.fromarray(img_pert_unnorma).save(path_intermediate, 'JPEG')
+
     for eh in exp_hook:
         eh.remove()
 
@@ -432,10 +450,10 @@ if __name__ == '__main__':
     inp = std * inp + mean
     inp = np.clip(inp, 0, 1)
     plt.imshow(inp, interpolation='none')
-    plt.text(5, 204, 'orig prob', color='black', fontsize=7,
+    plt.text(5, 196, 'orig prob', color='black', fontsize=11,
             bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
                       ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
-    plt.text(5, 217, str(np.round(prob_orig * 100, 1)) + '%', color='black',
+    plt.text(5, 217, str(np.round(prob_orig * 100, 1)) + '%', color='black', fontsize=17,
             bbox=dict(boxstyle='round', fc=(255 / 255, 255 / 255, 204 / 255),
                       ec=(255 / 255, 255 / 255, 204 / 255), alpha=0.7))
     plt.axis('off')
@@ -477,13 +495,14 @@ if __name__ == '__main__':
     print('deletion score: ', del_score)
 
     plt.imshow(1 - mask_np)
-    plt.text(185, 215, np.round(del_score, 3), color='black', fontsize=10,
+    plt.text(175, 215, np.round(del_score, 4), color='black', fontsize=17,
             bbox=dict(facecolor='white', alpha=1, ec='white'))
-    plt.text(185, 203, 'del score', color='white', fontsize=8)
-    plt.text(5, 215, str(np.round(masked_pred * 100, 3)) + '%', fontsize=10, bbox=dict(boxstyle='round',
-                                                                                      ec=(0., 0., 153/255),
+    plt.text(178, 200, 'del score', color='white', fontsize=11)
+    plt.text(5, 215, str(np.round(masked_pred * 100, 3)) + '%', fontsize=17, bbox=dict(boxstyle='round',
+                                                                                     ec=(0., 0., 153/255),
                                                                                       fc=(153/255, 221/255, 255/255),
                                                                                       alpha=0.8))
+    plt.colorbar()
     plt.axis('off')
     plt.show()
 
