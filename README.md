@@ -37,10 +37,10 @@ This work contributes to the field of AI interpretability by offering robust and
 - `docs/`: Documentation and additional resources related to the thesis.
 
 ## References
-- [Skywater SKY130 Open Source PDK](https://www.skywatertechnology.com/sky130-open-source-pdk/)
+
 
 ## Contact
-For any inquiries or collaborations, please contact Fabio Guzmán at fguzman@example.com.
+For any inquiries or collaborations, please contact Fabio Guzmán at fabioandres.guzman@gmail.com
 
 ---
 
