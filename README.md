@@ -6,7 +6,14 @@ This repository contains the code and documentation related to my PhD thesis tit
 ## Motivation
 The rapid advancement of CNN architectures, such as AlexNet, VGG16, GoogLeNet, ResNet50, and Florence, has led to impressive performance in various image classification tasks. However, these models often act as "black boxes," making their decision-making processes opaque and raising concerns about their reliability and fairness.
 
-## Objectives
+<p align="center">
+<img alt="App_screenshot" src="https://github.com/fguzman82/PhD-Thesis/blob/master/images/Image1.png">
+</p>
+
+## General Objective: 
+Develop methodologies for identifying and recovering concepts in convolutional neural networks using attribution techniques to improve confidence in decisions made by the networks.
+
+## Specific Objectives:
 1. **Concept Attribution**: Develop techniques to identify and attribute concepts within CNNs, improving the quality and robustness of explanations.
 2. **Concept Recovery**: Design methodologies to recover original concepts from CNNs affected by adversarial attacks or noise, thereby enhancing prediction reliability.
 
@@ -14,6 +21,19 @@ The rapid advancement of CNN architectures, such as AlexNet, VGG16, GoogLeNet, R
 ### Concept Identification
 - **Techniques**: Implement and evaluate various attribution methods, such as LIME, SHAP, Grad-CAM, and Meaningful Perturbation (MP).
 - **Fidelity and Robustness**: Assess the fidelity and robustness of these techniques using metrics like Intersection over Union (IoU) and Structural Similarity Index Measure (SSIM).
+
+### Toy example
+- **What does a CNN network understand about a cat?**
+- **What significant concepts does the neural network encode about a cat?**
+
+
+The developed methodology highlights in a much more detailed heatmap than the state-of-the-art "Meaningful Perturbation" method, not just the cat's face as the most important concept of the "cat" category, but also the details, particularly the pointed ears and eye shape.
+
+If the neural network focuses on the correct concept, it is a reliable neural network, validated under the particular concept, the methodology for identifying concepts validates the concepts and thus allows improving confidence in the decisions made by networks. It also enables identifying biases in datasets.
+
+<p align="center">
+<img alt="App_screenshot" src="https://github.com/fguzman82/PhD-Thesis/blob/master/images/Image2.png">
+</p>
 
 ### Concept Recovery
 - **Adversarial Robustness**: Utilize adversarial training techniques to improve the model's resilience against adversarial samples.
@@ -27,8 +47,18 @@ The rapid advancement of CNN architectures, such as AlexNet, VGG16, GoogLeNet, R
 ## Results
 The proposed methodologies demonstrate significant improvements in both fidelity and robustness compared to baseline models. The developed techniques provide high-quality explanations and effective recovery of original predictions, enhancing the transparency and reliability of CNN-based systems.
 
+<p align="center">
+<img width=500 alt="App_screenshot" src="https://github.com/fguzman82/PhD-Thesis/blob/master/images/Image3.png">
+</p>
+
+Fidelity in an explanation refers to the ability to identify the relevance of a feature when removed from an image, which decreases its prediction probability. Methods with better fidelity are those that minimize the deletion score, which monitors the drop in classification probability of a convolutional neural network when pixels are deleted. 
+
+We managed to lower the deletion score by a factor of 3.68x, which means that the represented concept condenses with fewer pixels, indicating that the method is more selective and meaningful in selecting the pixels that conform to the category's concept being evaluated.
+
 ## Conclusion
 This work contributes to the field of AI interpretability by offering robust and reliable methodologies for concept identification and recovery in CNNs. Future research directions include exploring concept-based transfer learning and network compression guided by interpretability.
+
+A family of methodologies for identifying concepts (MIC, MIC_blur, MIC_inp, and MIC_inp_tv) was developed by modifying Meaningful Perturbation and implementing a directory of corrections, to produce explanations with high fidelity and robustness that allow improving confidence, security, and transparency in decisions made by convolutional neural networks on images. Additionally, a concept recovery methodology (MRC) was developed, which generates a mask selecting representative attributes to recover predictions affected by noise or adversarial images using an optimization algorithm.
 
 ## Repository Structure
 - `code/`: Contains the implementation of the methodologies.
